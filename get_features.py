@@ -13,6 +13,7 @@ audiofiles = os.listdir(direc)
 audiofiles.remove(".DS_Store")
 
 N =len(audiofiles)
+#N=2
 img_height = 60
 fft_window_len = 1024
 segment_len = 41 #in samples
@@ -31,42 +32,56 @@ def windowing(spcgm):
     sp_len = np.shape(spcgm)[1]
     sp_hei = np.shape(spcgm)[0]
     nwins = 2*(sp_len // segment_len)-1
+    irregular_window = False
     if sp_len % segment_len >= s1:
         nwins+=1
+        if sp_len % segment_len+s1 > 0:
+            nwins+=1
+            irregular_window= True
+    elif sp_len % segment_len > 0:
+            nwins+=1
+            irregular_window= True
+
     theWindows = np.zeros((nwins, sp_hei, segment_len), np.float64)
-    for ro in range(nwins):
+    if irregular_window:
+        win_range=nwins-1
+    for ro in range(win_range):
         if ro%2 == 0:
-            startpos = (ro//2)*segment_len 
+            startpos = (ro//2)*segment_len
         else:
             startpos = (ro//2)*segment_len+s1
         mask = np.arange(startpos, startpos+segment_len)
         theWindows[ro] = spcgm[:, mask]
-    return theWindows, nwins    
+
+    if irregular_window:
+        mask=np.arange(sp_len-segment_len,sp_len)
+        theWindows[-1]=spcgm[:,mask]
+    return theWindows, nwins
 
 for n, au in enumerate(audiofiles):
     print("processing soundfile {0} of {1}, named {2}".format(n, N, au))
     y, sr = librosa.load(direc + "/" + au)
-    clip_len[n] = len(y)        
-    S = librosa.feature.melspectrogram(y, hop_length=512, 
+    clip_len[n] = len(y)
+    S = librosa.feature.melspectrogram(y, hop_length=512,
                                        n_fft=fft_window_len, sr=sr, n_mels=img_height)
     log_S = librosa.power_to_db(S, ref=np.max)
     if np.shape(log_S)[1] < segment_len:
         continue
     tmp = parse("{}-{}-{}-{}.wav", au)
-    label_for_file = int(tmp[1])         
+    label_for_file = int(tmp[1])
     new_wins, n_new_wins = windowing(log_S)
     print("label: " + tmp[1] + "\tlen (time samples)" + str(len(y)) + "\tnum obs. augm. from it: " + str(n_new_wins))
     observations = np.vstack((observations, new_wins))
     labels = np.hstack((labels, label_for_file*np.ones(n_new_wins, int) ))
-    
+
 plt.hist(clip_len)
 scipy.io.savemat("UrbanSound8K/fold%d.mat"%fold_num, dict(ob = observations, lb = labels))
 
 #small test
 #file_idx = 870
-#ob_idx = np.arange(5425, 5432)   
+#ob_idx = np.arange(5425, 5432)
 #y, sr = librosa.load(direc + "/" + audiofiles[file_idx])
-#S = librosa.feature.melspectrogram(y, hop_length=512, 
+#S = librosa.feature.melspectrogram(y, hop_length=512,
 #                                   n_fft=fft_window_len, sr=sr, n_mels=img_height)
 #log_S = librosa.power_to_db(S, ref=np.max)
 #scipy.io.savemat("UrbanSound8K/870.mat", dict(ob = observations[ob_idx], full = log_S))
