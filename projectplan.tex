@@ -1,0 +1,61 @@
+%Dear Students,
+%
+%The pProject synopsis can be any format. It should be handed in as an Assignment on DTU Inside Wednesday Nov 1st. Hand in one for each synopsis for each group.
+%
+%It must must contain:
+%
+%1. Title
+%2. Name and study id of all group members
+%3. Background and motivation
+%4. Milestones in 3 to 5 bulletpoints
+%5. References.
+%
+%it should not be more than 1 page long. The main requirement is that the project scope is realistic. Being ambitious is good but if you for example are both implementing your own models and using a new data set then there should be a more safe plan b using a standard data set and/or model.
+%
+%Something else: Remember that the TAs and me will still come to B306 aud 33 every Monday from 13. (The incident today was an exception.)
+%
+%Best regards,
+%
+%Ole
+
+\documentclass[utf-8]{article}
+\input{tp_general.tex}
+%\input{tp_mathgeneral.tex}
+%\input{tp_nc_vector.tex}
+%\input{tp_codigo.tex}
+\newcommand{\urb}{\textit{UrbanSound8K}}
+\begin{document}
+\section*{Synopsis for 02456 Project "Various Deep Learning Architectures for Urban Sound Classification"}
+\begin{tabular}{ll|ll}
+s161041 &Sébastien Demortain &s161027 &Péter Semság\\
+ s161174 &Lorenzo Belgrano &s161463 &Benjamin Jüttner
+\end{tabular}
+
+\subsection*{Background and Motivation:}
+Sound classification is a task commonly solved by RNNs rather than CNNs, which in turn are rather suitable for image data. However, since a spectrogram of an audio sequence can be interpreted as an image, CNNs too can be used for sound data, as was done e.g. in \cite{pizza}. Therefore, sound data is a good opportunity to work with two of the architectures we learned in 02456, namely CNNs and RNNs. The dataset chosen for the project was the \urb\cite{urban}, which is a collection of over 8000, 2 to 7 seconds long, audio clips from urban environments with labels such as dog barking or jackhammer.  
+
+\subsection*{Milestones:} %should probably not be too detailed
+\begin{enumerate}
+\item (also safe plan B) Reproduce the CNN architecture proposed in \cite{pizza}, with each audioclip processed into several $60\times41$ pixel spectrograms.\label{purepizza}
+\item same architecture and same data as in Milestone \ref{purepizza}, but now train the less noisy observations first and the noisier observations afterwards (see \textit{curriculum learning} \cite{curr}). See if the performance improves.
+\item Implement an architecture combined of CNN and RNN, as done in \cite{deepspeech} (will probably involve CTC). %if the network architecture allows, use sequences of different lenghts here? And do the curriculum stuff?
+\item Test the networks we have trained, optimzied and evaluted, on mixture audioclips, and see which classes have the strongest representation in the softmax output of the network. 
+\end{enumerate}
+
+
+\begin{thebibliography}{5}
+\bibitem{pizza} K. J. Piczak: "ENVIRONMENTAL SOUND CLASSIFICATION
+WITH CONVOLUTIONAL NEURAL NETWORKS", in \textit{2015 IEEE INTERNATIONAL WORKSHOP ON MACHINE LEARNING FOR SIGNAL PROCESSING}, Sept. 17–20, 2015, Boston, USA
+\bibitem{urban} J. Salamon, C. Jacoby, and J. P. Bello, "A dataset and
+taxonomy for urban sound research", in \textit{Proceedings
+of the ACM International Conference on Multimedia.}
+ACM, 2014, pp. 1041–1044.
+\bibitem{curr} Y. Bengio, J. Louradour, R. Collobert, J. Weston: "Curriculum Learning"
+\bibitem{deepspeech} Baidu Research – Silicon Valley AI Lab: "Deep Speech 2: End-to-End Speech Recognition in
+English and Mandarin"
+\end{thebibliography}
+
+
+
+
+\end{document} 
