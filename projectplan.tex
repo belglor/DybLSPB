@@ -36,9 +36,11 @@ Sound classification is a task commonly solved by RNNs rather than CNNs, which i
 
 \subsection*{Milestones:} %should probably not be too detailed
 \begin{enumerate}
-\item (also safe plan B) Reproduce the CNN architecture proposed in \cite{pizza}, with each audioclip processed into several $60\times41$ pixel spectrograms.\label{purepizza}
+\item (also safe plan B) Reproduce the CNN architecture proposed in \cite{pizza}, with each audioclip processed into several $60\times41$ pixel spectrograms. Try to interpret "the abstract features" learned by the model. Choose a randomly selected subset of the misclassified observations and try to interpret why they are hard to classify.\label{purepizza}
 \item Same architecture and same data as in Milestone \ref{purepizza}, but now train easier observations first and more difficult observations afterwards (see \textit{curriculum learning} \cite{curr}). See if the performance improves.
-\item Implement an architecture combined of CNN and RNN (maybe realizing some of the ideas in \cite{deepspeech}).\label{cnnrnn} %if the network architecture allows, use sequences of different lenghts here? And do the curriculum stuff?
+\item Implement an architecture combined of CNN and RNN (maybe realizing some of the ideas in \cite{deepspeech}). %Try to use the findings about "the abstract features" from Milestone \ref{purepizza} to create a better architecture.
+\label{cnnrnn} %if the network architecture allows, use sequences of different lenghts here? And do the curriculum stuff?
+
 \item %Take good network architecture found in Milestones \ref{purepizza} through \ref{cnnrnn} and e
 Experiment with mixed data:
 (i) Artificially overlap two audios of classes $a$ and $b$ and make it one observation. The network should give a softmax output where the highest values are in $a$ and $b$.  
