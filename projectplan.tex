@@ -32,12 +32,12 @@ s161041 &Sébastien Demortain &s161027 &Péter Semság\\
 \end{tabular}
 
 \subsection*{Background and Motivation:}
-Sound classification is a task commonly solved by RNNs rather than CNNs, which in turn are rather suitable for image data. However, since a spectrogram of an audio sequence can be interpreted as an image, CNNs too can be used for sound data, as was done e.g. in \cite{pizza}. Therefore, sound data is a good opportunity to work with two of the architectures we learned in 02456, namely CNNs and RNNs. The dataset chosen for the project was the \urb\cite{urban}, which is a collection of over 8000, 2 to 7 seconds long, audio clips from urban environments with labels such as dog barking or jackhammer.  
+Sound classification is a task commonly solved by RNNs rather than CNNs, which in turn are rather suitable for image data. However, since a spectrogram of an audio sequence can be interpreted as an image, CNNs too can be used for sound data, as was done e.g. in \cite{pizza}. Therefore, sound data is a good opportunity to work with two of the architectures we learned in 02456, namely CNNs and RNNs. The dataset chosen for the project was the \urb\cite{urban}, which is a collection of over 8000, up to 4 seconds long, audios from urban environments with labels such as dog barking or jackhammer.  
 
 \subsection*{Milestones:} %should probably not be too detailed
 \begin{enumerate}
 \item (also safe plan B) Reproduce the CNN architecture proposed in \cite{pizza}, with each audioclip processed into several $60\times41$ pixel spectrograms.\label{purepizza}
-\item Same architecture and same data as in Milestone \ref{purepizza}, but now train the less noisy observations first and the noisier observations afterwards (see \textit{curriculum learning} \cite{curr}). See if the performance improves.
+\item Same architecture and same data as in Milestone \ref{purepizza}, but now train easier observations first and more difficult observations afterwards (see \textit{curriculum learning} \cite{curr}). See if the performance improves.
 \item Implement an architecture combined of CNN and RNN (maybe realizing some of the ideas in \cite{deepspeech}).\label{cnnrnn} %if the network architecture allows, use sequences of different lenghts here? And do the curriculum stuff?
 \item %Take good network architecture found in Milestones \ref{purepizza} through \ref{cnnrnn} and e
 Experiment with mixed data:
