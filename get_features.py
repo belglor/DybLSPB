@@ -13,7 +13,6 @@ audiofiles = os.listdir(direc)
 audiofiles.remove(".DS_Store")
 
 N =len(audiofiles)
-#N=2
 img_height = 60
 fft_window_len = 1024
 segment_len = 41 #in samples
@@ -32,19 +31,23 @@ def windowing(spcgm):
     sp_len = np.shape(spcgm)[1]
     sp_hei = np.shape(spcgm)[0]
     nwins = 2*(sp_len // segment_len)-1
-    irregular_window = False
-    if sp_len % segment_len >= s1:
-        nwins+=1
-        if sp_len % segment_len+s1 > 0:
-            nwins+=1
-            irregular_window= True
-    elif sp_len % segment_len > 0:
-            nwins+=1
-            irregular_window= True
+    irregular_window = True #will happen nearly always
+    rest_at_the_end = sp_len % segment_len
+    if rest_at_the_end == s1: #everything fits perfectly
+        extra_windows = 1
+        irregular_window = False
+    elif rest_at_the_end == 0: #everything fits perfectly
+        extra_windows = 0
+        irregular_window = False
+    elif rest_at_the_end < s1: extra_windows = 1
+    elif rest_at_the_end > s1: extra_windows = 2
+    nwins += extra_windows  
 
     theWindows = np.zeros((nwins, sp_hei, segment_len), np.float64)
     if irregular_window:
         win_range=nwins-1
+    else:
+        win_range=nwins
     for ro in range(win_range):
         if ro%2 == 0:
             startpos = (ro//2)*segment_len
@@ -75,7 +78,7 @@ for n, au in enumerate(audiofiles):
     labels = np.hstack((labels, label_for_file*np.ones(n_new_wins, int) ))
 
 plt.hist(clip_len)
-scipy.io.savemat("UrbanSound8K/fold%d.mat"%fold_num, dict(ob = observations, lb = labels))
+scipy.io.savemat("UrbanSound8K/fold%d_with_irregwin.mat"%fold_num, dict(ob = observations, lb = labels))
 
 #small test
 #file_idx = 870
