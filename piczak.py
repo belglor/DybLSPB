@@ -370,8 +370,8 @@ with tf.Session() as sess:
         # print('Test Loss {:6.3f}, Test acc {:6.3f}'.format(
         #             np.mean(test_loss), np.mean(test_accuracy)))
 
-    save_path = saver.save(sess, "/model.ckpt") # hopefully works for GBAR
-    print(save_path)
+        save_path = saver.save(sess, "/model.ckpt") # hopefully works for GBAR
+        print(save_path)
     except KeyboardInterrupt:
         pass
 
