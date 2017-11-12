@@ -1,10 +1,5 @@
 from __future__ import absolute_import, division, print_function
 
-#get_ipython().run_line_magic('matplotlib', 'inline')
-import matplotlib.pyplot as plt
-import numpy as np
-#from __future__ import absolute_import, division, print_function
-
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -16,64 +11,12 @@ import utils
 import batch_loader as bl
 import scipy
 from scipy import io
-import librosa
-
-#Import shit
-# import keras
-# from keras.layers import Input, Dense, Conv2D, MaxPooling2D, Dropout
 
 from tensorflow.contrib.layers import fully_connected, convolution2d, flatten, batch_norm, max_pool2d, dropout
 from tensorflow.python.ops.nn import relu, elu, relu6, sigmoid, tanh, softmax
 from tensorflow.python.ops.nn import dynamic_rnn
 
-# #For the final dense network
-# from keras.models import Sequential
-# from keras.layers import Dense, Activation, Conv2D, MaxPooling2D, Flatten, Dropout
-# from keras import backend as K
-# from keras import regularizers
-# model = None
-
 tf.reset_default_graph()
-
-# ### TEST OTHERS' CODE
-#
-# model = Sequential()
-#
-# model.add(Conv2D(80, kernel_size=(57, 6), strides=(1, 1),
-#                  activation='relu',
-#                  input_shape=(60,41,1),
-#                  kernel_regularizer=regularizers.l2(0.001)))
-#
-# model.add(MaxPooling2D(pool_size=(4, 3), strides=(1, 3)))
-# model.add(Dropout(0.4))
-#
-# model.add(Conv2D(80, kernel_size=(1, 3), strides=(1, 1),
-#                  activation='relu',
-#                  kernel_regularizer=regularizers.l2(0.001)))
-#
-# model.add(MaxPooling2D(pool_size=(1, 3), strides=(1, 3)))
-#
-# print(model.summary())
-#
-# model.add(Flatten())
-#
-# # Layer 1
-# model.add(Dense(5000, kernel_regularizer=regularizers.l2(0.001)))
-# model.add(Activation('relu'))
-# model.add(Dropout(0.5))
-#
-# # layer 2
-# model.add(Dense(5000, kernel_regularizer=regularizers.l2(0.001)))
-# model.add(Dropout(0.5))
-# model.add(Activation('relu'))
-#
-# # layer
-# model.add(Dense(10))
-# model.add(Activation('softmax'))
-#
-# print(model.summary())
-#
-# ###
 
 # Random seed for reproducibility
 np.random.seed(1337)
@@ -142,15 +85,9 @@ y_pl = tf.placeholder(tf.float64, [None, num_classes], name='yPlaceholder')
 y_pl = tf.cast(y_pl, tf.float32)
 
 #Setting up the filters and weights to optimize
-
-#with tf.variable_scope('layer2'):
-
-
 print('Trace of the tensors shape as it is propagated through the network.')
 print('Layer name \t Output size')
 print('----------------------------')
-
-#Define the network using Keras
 
 # Convolutional layers
 with tf.variable_scope('convLayer1'):
@@ -332,52 +269,10 @@ with tf.Session() as sess:
 
             epoch = epoch + 1;
 
-        #     _train_loss, _train_accuracy = [], []
-        #
-        #     ## Run train op
-        #     x_batch, y_batch = mnist_data.train.next_batch(batch_size)
-        #     fetches_train = [train_op, cross_entropy, accuracy]
-        #     feed_dict_train = {x_pl: x_batch, y_pl: y_batch}
-        #     _, _loss, _acc = sess.run(fetches_train, feed_dict_train)
-        #
-        #     _train_loss.append(_loss)
-        #     _train_accuracy.append(_acc)
-        #
-        #
-        #     ## Compute validation loss and accuracy
-        #     if mnist_data.train.epochs_completed % 1 == 0                     and mnist_data.train._index_in_epoch <= batch_size:
-        #         train_loss.append(np.mean(_train_loss))
-        #         train_accuracy.append(np.mean(_train_accuracy))
-        #
-        #         fetches_valid = [cross_entropy, accuracy]
-        #
-        #         feed_dict_valid = {x_pl: mnist_data.validation.images, y_pl: mnist_data.validation.labels}
-        #         _loss, _acc = sess.run(fetches_valid, feed_dict_valid)
-        #
-        #         valid_loss.append(_loss)
-        #         valid_accuracy.append(_acc)
-        #         print("Epoch {} : Train Loss {:6.3f}, Train acc {:6.3f},  Valid loss {:6.3f},  Valid acc {:6.3f}".format(
-        #             mnist_data.train.epochs_completed, train_loss[-1], train_accuracy[-1], valid_loss[-1], valid_accuracy[-1]))
-        #
-        #
-        # test_epoch = mnist_data.test.epochs_completed
-        # while mnist_data.test.epochs_completed == test_epoch:
-        #     x_batch, y_batch = mnist_data.test.next_batch(batch_size)
-        #     feed_dict_test = {x_pl: x_batch, y_pl: y_batch}
-        #     _loss, _acc = sess.run(fetches_valid, feed_dict_test)
-        #     test_loss.append(_loss)
-        #     test_accuracy.append(_acc)
-        # print('Test Loss {:6.3f}, Test acc {:6.3f}'.format(
-        #             np.mean(test_loss), np.mean(test_accuracy)))
-
         save_path = saver.save(sess, "/model.ckpt") # hopefully works for GBAR
         print(save_path)
     except KeyboardInterrupt:
         pass
-
-
-# In[34]:
-
 
 epoch = np.arange(len(train_loss))
 plt.figure()
