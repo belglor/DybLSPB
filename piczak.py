@@ -167,7 +167,7 @@ with tf.variable_scope('output_layer'):
     y = tf.nn.softmax(dense_out)
     print('denseOut\t', y.get_shape())
 
-print('Model consits of ', utils.num_params(), 'trainable parameters.')
+print('Model consists of ', utils.num_params(), 'trainable parameters.')
 
 with tf.variable_scope('loss'):
     # computing cross entropy per sample
@@ -239,7 +239,6 @@ with tf.Session() as sess:
     try:
         while (epoch <= max_epochs):
             batch_data, batch_labels = training_loader.next_batch()
-            print('====================================================')
             ### TRAINING ###
             # what to feed to our train_op
             # notice we onehot encode our predictions to change shape from (batch,) -> (batch, num_output)
@@ -266,16 +265,17 @@ with tf.Session() as sess:
             res = sess.run(fetches=fetches_valid, feed_dict=feed_dict_valid)
             test_loss += [res[0]]
             test_accuracy += [res[1]]
-
-            epoch = epoch + 1;
-
-        save_path = saver.save(sess, "/model.ckpt") # hopefully works for GBAR
-        print(save_path)
+            epoch += 1;
+            print("completed %d epochs." % epoch)
+        whatever = 1000
+        save_path = saver.save(sess, "the_saved_model", global_step=whatever) # hopefully works for GBAR and on your local computer
+        print("model saved under the path: ", save_path)
     except KeyboardInterrupt:
         pass
 
 epoch = np.arange(len(train_loss))
-plt.figure()
-plt.plot(epoch, train_accuracy,'r', epoch, valid_accuracy,'b')
-plt.legend(['Train Acc','Val Acc'], loc=4)
-plt.xlabel('Epochs'), plt.ylabel('Acc'), plt.ylim([0.75,1.03])
+#TODO: fix this
+#plt.figure()
+#plt.plot(epoch, train_accuracy,'r', epoch, valid_accuracy,'b')
+#plt.legend(['Train Acc','Val Acc'], loc=4)
+#plt.xlabel('Epochs'), plt.ylabel('Acc'), plt.ylim([0.75,1.03])
