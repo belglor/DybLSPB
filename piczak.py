@@ -13,7 +13,8 @@ import os
 import sys
 sys.path.append(os.path.join('.', '..'))
 import utils
-#import batch_loader as bl
+import batch_loader as bl
+import scipy
 from scipy import io
 import librosa
 
@@ -249,32 +250,45 @@ with tf.variable_scope('performance'):
     # averaging the one-hot encoded vector
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
+#saver = tf.train.Saver()
 
-#Test the forward pass : ADD THE BATCH LOADER (pylearn2? test it) + understand data structure + see how to run AWS
+### Test the forward pass : ADD THE BATCH LOADER (pylearn2? test it) + understand data structure + see how to run AWS
 
 #Random audio images for testing
 x_test_forward = np.random.normal(0, 1, [1,60,41,1]).astype('float32') #dummy data
 
+# restricting memory usage, TensorFlow is greedy and will use all memory otherwise
+gpu_opts = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
 
-with tf.Session(config=tf.ConfigProto(gpu_options=gpu_opts)) as sess:
-    sess.run(tf.global_variables_initializer())
-    feed_dict = {x_pl: x_test_forward}
-    res_forward_pass = sess.run(fetches=[y], feed_dict=feed_dict)
+sess=tf.Session(config=tf.ConfigProto(gpu_options=gpu_opts))
+sess.run(tf.global_variables_initializer())
+feed_dict = {x_pl: x_test_forward}
+res_forward_pass = sess.run(fetches=[y], feed_dict=feed_dict)
 
 print("y", res_forward_pass[0].shape)
 print('Forward pass successful!')
 
 
-# ## Training
+### Training
 
 # Batch shit
 batch_size = 1000
 max_epochs = 1
 epoch=0
 
-scipy.io.loadmat('fold1_with_irregwin.mat')
+# For now, training fold
+fold1mat=scipy.io.loadmat('fold1_with_irregwin.mat')
+training_data=fold1mat['ob']
+training_data=np.expand_dims(training_data,axis=-1)
+training_labels=utils.onehot(np.transpose(fold1mat['lb']),num_classes)
+training_loader = bl.batch_loader(training_data, training_labels, batch_size);
 
-loader = bl.batch_loader(subdata, sublabels, batch_size);
+# For now, test fold
+fold2mat=scipy.io.loadmat('fold2_with_irregwin.mat')
+test_data=fold2mat['ob']
+test_data=np.expand_dims(test_data,axis=-1)
+test_labels=utils.onehot(np.transpose(fold2mat['lb']),num_classes)
+test_loader = bl.batch_loader(test_data, test_labels, batch_size);
 
 valid_loss, valid_accuracy = [], []
 train_loss, train_accuracy = [], []
@@ -285,12 +299,12 @@ with tf.Session() as sess:
     print('Begin training loop')
     try:
         while (epoch <= max_epochs):
-            batch_data, batch_labels = loader.next_batch();
+            batch_data, batch_labels = training_loader.next_batch()
             print('====================================================')
             ### TRAINING ###
             # what to feed to our train_op
             # notice we onehot encode our predictions to change shape from (batch,) -> (batch, num_output)
-            feed_dict_train = {x_pl: X_tr, y_: utils.onehot(y_tr, num_output)}
+            feed_dict_train = {x_pl: batch_data, y_pl: batch_labels}
 
             # deciding which parts to fetch, train_op makes the classifier "train"
             fetches_train = [train_op, cross_entropy, accuracy]
@@ -298,67 +312,61 @@ with tf.Session() as sess:
             # running the train_op
             res = sess.run(fetches=fetches_train, feed_dict=feed_dict_train)
             # storing cross entropy (second fetch argument, so index=1)
-            train_cost += [res[1]]
-            train_acc += [res[2]]
+            train_loss += [res[1]]
+            train_accuracy += [res[2]]
 
             ### VALIDATING ###
+            batch_data, batch_labels = test_loader.next_batch();
             # what to feed our accuracy op
-            feed_dict_valid = {x_pl: X_val, y_: utils.onehot(y_val, num_output)}
+            feed_dict_valid = {x_pl: batch_data, y_pl : batch_labels}
 
             # deciding which parts to fetch
             fetches_valid = [cross_entropy, accuracy]
 
             # running the validation
             res = sess.run(fetches=fetches_valid, feed_dict=feed_dict_valid)
-            val_cost += [res[0]]
-            val_acc += [res[1]]
+            test_loss += [res[0]]
+            test_accuracy += [res[1]]
 
-            print('Current idx in epoch:')
-            print(loader.epoch_idx)
-            print('Current batch indexes:')
-            print(loader.batch_idx)
-            if (loader.end_epoch):
-                epoch = epoch + 1;
-                print('### Finished epoch: ###')
-                print(epoch)
+            epoch = epoch + 1;
 
-            _train_loss, _train_accuracy = [], []
-            
-            ## Run train op
-            x_batch, y_batch = mnist_data.train.next_batch(batch_size)
-            fetches_train = [train_op, cross_entropy, accuracy]
-            feed_dict_train = {x_pl: x_batch, y_pl: y_batch}
-            _, _loss, _acc = sess.run(fetches_train, feed_dict_train)
-            
-            _train_loss.append(_loss)
-            _train_accuracy.append(_acc)
-            
-
-            ## Compute validation loss and accuracy
-            if mnist_data.train.epochs_completed % 1 == 0                     and mnist_data.train._index_in_epoch <= batch_size:
-                train_loss.append(np.mean(_train_loss))
-                train_accuracy.append(np.mean(_train_accuracy))
-
-                fetches_valid = [cross_entropy, accuracy]
-                
-                feed_dict_valid = {x_pl: mnist_data.validation.images, y_pl: mnist_data.validation.labels}
-                _loss, _acc = sess.run(fetches_valid, feed_dict_valid)
-                
-                valid_loss.append(_loss)
-                valid_accuracy.append(_acc)
-                print("Epoch {} : Train Loss {:6.3f}, Train acc {:6.3f},  Valid loss {:6.3f},  Valid acc {:6.3f}".format(
-                    mnist_data.train.epochs_completed, train_loss[-1], train_accuracy[-1], valid_loss[-1], valid_accuracy[-1]))
-        
-        
-        test_epoch = mnist_data.test.epochs_completed
-        while mnist_data.test.epochs_completed == test_epoch:
-            x_batch, y_batch = mnist_data.test.next_batch(batch_size)
-            feed_dict_test = {x_pl: x_batch, y_pl: y_batch}
-            _loss, _acc = sess.run(fetches_valid, feed_dict_test)
-            test_loss.append(_loss)
-            test_accuracy.append(_acc)
-        print('Test Loss {:6.3f}, Test acc {:6.3f}'.format(
-                    np.mean(test_loss), np.mean(test_accuracy)))
+        #     _train_loss, _train_accuracy = [], []
+        #
+        #     ## Run train op
+        #     x_batch, y_batch = mnist_data.train.next_batch(batch_size)
+        #     fetches_train = [train_op, cross_entropy, accuracy]
+        #     feed_dict_train = {x_pl: x_batch, y_pl: y_batch}
+        #     _, _loss, _acc = sess.run(fetches_train, feed_dict_train)
+        #
+        #     _train_loss.append(_loss)
+        #     _train_accuracy.append(_acc)
+        #
+        #
+        #     ## Compute validation loss and accuracy
+        #     if mnist_data.train.epochs_completed % 1 == 0                     and mnist_data.train._index_in_epoch <= batch_size:
+        #         train_loss.append(np.mean(_train_loss))
+        #         train_accuracy.append(np.mean(_train_accuracy))
+        #
+        #         fetches_valid = [cross_entropy, accuracy]
+        #
+        #         feed_dict_valid = {x_pl: mnist_data.validation.images, y_pl: mnist_data.validation.labels}
+        #         _loss, _acc = sess.run(fetches_valid, feed_dict_valid)
+        #
+        #         valid_loss.append(_loss)
+        #         valid_accuracy.append(_acc)
+        #         print("Epoch {} : Train Loss {:6.3f}, Train acc {:6.3f},  Valid loss {:6.3f},  Valid acc {:6.3f}".format(
+        #             mnist_data.train.epochs_completed, train_loss[-1], train_accuracy[-1], valid_loss[-1], valid_accuracy[-1]))
+        #
+        #
+        # test_epoch = mnist_data.test.epochs_completed
+        # while mnist_data.test.epochs_completed == test_epoch:
+        #     x_batch, y_batch = mnist_data.test.next_batch(batch_size)
+        #     feed_dict_test = {x_pl: x_batch, y_pl: y_batch}
+        #     _loss, _acc = sess.run(fetches_valid, feed_dict_test)
+        #     test_loss.append(_loss)
+        #     test_accuracy.append(_acc)
+        # print('Test Loss {:6.3f}, Test acc {:6.3f}'.format(
+        #             np.mean(test_loss), np.mean(test_accuracy)))
 
 
     except KeyboardInterrupt:
