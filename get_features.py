@@ -5,13 +5,18 @@ import os
 import scipy.io
 from parse import *
 
-fold_num = 5 #change this to fit the fold number
+#======= ADJUSTABLE PARAMETERS ================================================
+fold_num = 1 #change this to fit the fold number
+whole_audios = True #if True, every audio contributes exactly one observation, therefore the length varies
+#==============================================================================
+
 
 direc = "UrbanSound8K/audio/fold" + str(fold_num)
 audiofiles = os.listdir(direc)
 
 audiofiles.remove(".DS_Store")
 
+num_classes = 10
 N =len(audiofiles)
 img_height = 60
 fft_window_len = 1024
@@ -23,8 +28,16 @@ num_channels = 2 #the spectrogram and the deltas
 #thedata = np.zeros((N, num_channels, img_height, img_width), np.float64)
 #get the lengths of the respective audio sequences
 clip_len = np.zeros(N, np.float64)
+if whole_audios:
+    labels = np.zeros(N, int)
+    observations = np.zeros((N, segment_len), np.float64)
 labels = np.zeros(0, int)
 observations = np.zeros((0, img_height, segment_len), np.float64)
+
+num_too_short = 0 #number of audioclips that are too short to give even one observation
+classPriorsRaw = np.zeros(num_classes, np.float64)
+classPriorsBeforeWindowing = np.zeros(num_classes, np.float64)
+classPriorsAfterWindowing = np.zeros(num_classes, np.float64)
 
 def windowing(spcgm):
     s1 = segment_len // 2
@@ -62,23 +75,40 @@ def windowing(spcgm):
     return theWindows, nwins
 
 for n, au in enumerate(audiofiles):
-    print("processing soundfile {0} of {1}, named {2}".format(n, N, au))
+    tmp = parse("{}-{}-{}-{}.wav", au)
+    label_for_file = int(tmp[1])
+    classPriorsRaw[label_for_file] += 1
+    print("processing soundfile {0} of {1}, label {3}, named {2}".format(n, N, au, label_for_file))
     y, sr = librosa.load(direc + "/" + au)
     clip_len[n] = len(y)
     S = librosa.feature.melspectrogram(y, hop_length=512,
                                        n_fft=fft_window_len, sr=sr, n_mels=img_height)
     log_S = librosa.power_to_db(S, ref=np.max)
-    if np.shape(log_S)[1] < segment_len:
-        continue
-    tmp = parse("{}-{}-{}-{}.wav", au)
-    label_for_file = int(tmp[1])
+    if np.shape(log_S)[1] < segment_len: continue
+    classPriorsBeforeWindowing[label_for_file] += 1
     new_wins, n_new_wins = windowing(log_S)
-    print("label: " + tmp[1] + "\tlen (time samples)" + str(len(y)) + "\tnum obs. augm. from it: " + str(n_new_wins))
+    classPriorsAfterWindowing[label_for_file] += n_new_wins
+#    print("label: " + tmp[1] + "\tlen (time samples)" + str(len(y)) + "\tnum obs. augm. from it: " + str(n_new_wins))
     observations = np.vstack((observations, new_wins))
     labels = np.hstack((labels, label_for_file*np.ones(n_new_wins, int) ))
 
+tooShortList = classPriorsRaw - classPriorsBeforeWindowing
+classPriorsRaw /= N
+classPriorsBeforeWindowing /= N - np.sum(tooShortList)
+N2 = np.shape(observations)[0]
+classPriorsAfterWindowing /= N2
+print("augmented from {0} to {1} observations.".format(N, N2) )
+print("classPriorsBeforeWindowing: ", classPriorsBeforeWindowing)
+print("classPriorsAfterWindowing: ", classPriorsAfterWindowing)
+
 plt.hist(clip_len)
-scipy.io.savemat("UrbanSound8K/fold%d_with_irregwin.mat"%fold_num, dict(ob = observations, lb = labels))
+scipy.io.savemat("UrbanSound8K/fold%d_with_irregwin.mat"%fold_num, 
+                 dict(N=N, N2=N2, ob = observations, 
+                      lb = labels, tooShortList = tooShortList, classPriorsRaw =classPriorsRaw, 
+                      classPriorsBeforeWindowing = classPriorsBeforeWindowing,
+                      classPriorsAfterWindowing = classPriorsAfterWindowing
+                      )
+                 )
 
 #small test
 #file_idx = 870
