@@ -228,7 +228,7 @@ with tf.variable_scope('output_layer'):
         kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_output),
     )
     y = tf.nn.softmax(dense_out)
-    print('denseOut\t', y.get_shape())    
+    print('denseOut\t', y.get_shape())
 
 print('Model consits of ', utils.num_params(), 'trainable parameters.')
 
@@ -237,7 +237,7 @@ with tf.variable_scope('loss'):
     cross_entropy = -tf.reduce_sum(y_pl * tf.log(y+1e-8), reduction_indices=[1])
     # averaging over samples
     cross_entropy = tf.reduce_mean(cross_entropy)
-    
+
 with tf.variable_scope('training'):
     # defining our optimizer
     sgd = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=momentum, use_nesterov=True)
@@ -293,6 +293,8 @@ test_loader = bl.batch_loader(test_data, test_labels, batch_size);
 valid_loss, valid_accuracy = [], []
 train_loss, train_accuracy = [], []
 test_loss, test_accuracy = [], []
+
+saver = tf.train.Saver() # defining saver function
 
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
@@ -368,7 +370,8 @@ with tf.Session() as sess:
         # print('Test Loss {:6.3f}, Test acc {:6.3f}'.format(
         #             np.mean(test_loss), np.mean(test_accuracy)))
 
-
+    save_path = saver.save(sess, "/model.ckpt") # hopefully works for GBAR
+    print(save_path)
     except KeyboardInterrupt:
         pass
 
