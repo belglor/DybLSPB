@@ -1,4 +1,5 @@
 --------------------------------------------------
+---basic push and pull to/from github:
 1. git pull https://github.com/pr3d1c70r/DybLSPB
 
 2. git remote add origin https://github.com/pr3d1c70r/DybLSPB
@@ -24,11 +25,19 @@ step 4: git branch -m good_branch master
 --------------------------------------------------
 ---if you would like to commit stuff but you are afraid that there might be new commits on GitHub:
 say you have commits 42aaaa, 42bbbb, 42cccc and local uncommitted changes. You want to pull from GitHub but this would destroy your local changes.
-step 1: commit your (relevant) local changes. If you don't want to commit everything, then save the rest in a safe place.
-step 2: git branch -m master local_stuff
+step 1: commit your (relevant) local changes (to your local repository, not to GitHub). If you don't want to commit everything, then save the rest in a safe place.
+step 2: git branch -m master local_stuff (renames master into local_stuff)
 step 3: git checkout 42cccc
 step 4: git checkout -b master
 step 5: git pull https://github.com/pr3d1c70r/DybLSPB
 step 6: git merge local_stuff
 (if needed) step 7: resolve possible merge issues (by hand). Then commit the files that had to be changed to solve the merge issues.
 step 8: push to GitHub. 
+
+--------------------------------------------------
+---if you made a bad commit
+scenario 1: The bad commit is already on GitHub: Bad Luck. Do not change the commit, because other people might already be based on this commit. Instead, push a new commit to GitHub that contains the necessary improvements.
+scenario 2: The bad commit is not yet on GitHub:
+step 1: make improvements and "git add" the relevant file(s).
+step 2: git commit --amend -m "a new commit message"
+DO NOT write only "git commit --amend" (without -m "..."). If you do that, you will fall into a text editor trap from which no one escapes.
