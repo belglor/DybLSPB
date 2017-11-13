@@ -7,3 +7,13 @@
 	3. git push origin master
 OR
 3. git push --set-upstream https://github.com/pr3d1c70r/DybLSPB master
+
+if you want to delete commits without using git reset:
+say you have commits A, B, C, D, E but you want to delete D and E.
+!!!step 0: check if somewhere in D or E or in your uncommited local changes there is something that you DON'T want to destroy. If that is the case, save it in a safe file in a safe place. 
+step 1: git checkout <commit C>  ("you are in detached HEAD etc.") (<good commit> is the first few characters of the commit hash)
+step 2: git checkout -b good_branch ("switched to new branch good_branch")
+step 3: git branch -m master bad_branch (renames master into bad_branch)
+step 4: git branch -m good_branch master
+(optional) step 5: git branch -D bad_branch (deletes the bad branch)
+(optional) step 6: commit the stuff that you saved in step 0
