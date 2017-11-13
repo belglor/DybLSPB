@@ -206,11 +206,11 @@ print("y", res_forward_pass[0].shape)
 print('Forward pass successful!')
 
 
-### Training
+### Cross-validation
 
 # Batch shit
 batch_size = 1000
-max_epochs = 5
+max_epochs = 1
 epoch=0
 
 #Training/validation set
@@ -219,10 +219,10 @@ fold1mat = scipy.io.loadmat('fold1_with_irregwin.mat')
 train_data = fold1mat['ob']
 train_labels = utils.onehot(np.transpose(fold1mat['lb']),num_classes)
 
-for i in range(2,7):
-    foldmat=scipy.io.loadmat('fold{}_with_irregwin.mat'.format(i))
-    train_data=np.concatenate((train_data,foldmat['ob']),axis=0)
-    train_labels=np.concatenate((train_labels,utils.onehot(np.transpose(foldmat['lb']),num_classes)),axis=0)
+# for i in range(2,7):
+#     foldmat=scipy.io.loadmat('fold{}_with_irregwin.mat'.format(i))
+#     train_data=np.concatenate((train_data,foldmat['ob']),axis=0)
+#     train_labels=np.concatenate((train_labels,utils.onehot(np.transpose(foldmat['lb']),num_classes)),axis=0)
 
 train_data=np.expand_dims(train_data,axis=-1)
 train_loader = bl.batch_loader(train_data, train_labels, batch_size)
@@ -230,11 +230,10 @@ train_loader = bl.batch_loader(train_data, train_labels, batch_size)
 fold7mat=scipy.io.loadmat('fold7_with_irregwin.mat')
 valid_data=fold7mat['ob']
 valid_labels=utils.onehot(np.transpose(fold7mat['lb']),num_classes)
-
-for i in range(7,10):
-    foldmat=scipy.io.loadmat('fold{}_with_irregwin.mat'.format(i))
-    valid_data=np.concatenate((valid_data,foldmat['ob']),axis=0)
-    valid_labels=np.concatenate((valid_labels,utils.onehot(np.transpose(foldmat['lb']),num_classes)),axis=0)
+# for i in range(7,10):
+#     foldmat=scipy.io.loadmat('fold{}_with_irregwin.mat'.format(i))
+#     valid_data=np.concatenate((valid_data,foldmat['ob']),axis=0)
+#     valid_labels=np.concatenate((valid_labels,utils.onehot(np.transpose(foldmat['lb']),num_classes)),axis=0)
 valid_data=np.expand_dims(valid_data,axis=-1)
 
 #We test on fold10
@@ -303,8 +302,8 @@ with tf.Session() as sess:
         #     test_accuracy.append(_acc)
 
         whatever = 1000
-        #save_path = saver.save(sess, "the_saved_model", global_step=whatever) # hopefully works for GBAR and on your local computer
-        #print("model saved under the path: ", save_path)
+        save_path = saver.save(sess, "./saved_models/the_saved_model.ckpt", global_step=whatever) # hopefully works for GBAR and on your local computer
+        print("model saved under the path: ", save_path)
     except KeyboardInterrupt:
         pass
 
