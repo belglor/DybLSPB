@@ -189,7 +189,7 @@ with tf.variable_scope('performance'):
 
 #saver = tf.train.Saver()
 
-### Test the forward pass : ADD THE BATCH LOADER (pylearn2? test it) + understand data structure + see how to run AWS
+### Test the forward pass
 
 #Random audio images for testing
 x_test_forward = np.random.normal(0, 1, [1,60,41,1]).astype('float32') #dummy data
@@ -210,66 +210,101 @@ print('Forward pass successful!')
 
 # Batch shit
 batch_size = 1000
-max_epochs = 1
+max_epochs = 5
 epoch=0
 
-# For now, training fold
-fold1mat=scipy.io.loadmat('fold1_with_irregwin.mat')
-training_data=fold1mat['ob']
-training_data=np.expand_dims(training_data,axis=-1)
-training_labels=utils.onehot(np.transpose(fold1mat['lb']),num_classes)
-training_loader = bl.batch_loader(training_data, training_labels, batch_size);
+#Training/validation set
 
-# For now, test fold
-fold2mat=scipy.io.loadmat('fold2_with_irregwin.mat')
-test_data=fold2mat['ob']
-test_data=np.expand_dims(test_data,axis=-1)
-test_labels=utils.onehot(np.transpose(fold2mat['lb']),num_classes)
-test_loader = bl.batch_loader(test_data, test_labels, batch_size);
+fold1mat = scipy.io.loadmat('fold1_with_irregwin.mat')
+train_data = fold1mat['ob']
+train_labels = utils.onehot(np.transpose(fold1mat['lb']),num_classes)
 
-valid_loss, valid_accuracy = [], []
+for i in range(2,7):
+    foldmat=scipy.io.loadmat('fold{}_with_irregwin.mat'.format(i))
+    train_data=np.concatenate((train_data,foldmat['ob']),axis=0)
+    train_labels=np.concatenate((train_labels,utils.onehot(np.transpose(foldmat['lb']),num_classes)),axis=0)
+
+train_data=np.expand_dims(train_data,axis=-1)
+train_loader = bl.batch_loader(train_data, train_labels, batch_size)
+
+fold7mat=scipy.io.loadmat('fold7_with_irregwin.mat')
+valid_data=fold7mat['ob']
+valid_labels=utils.onehot(np.transpose(fold7mat['lb']),num_classes)
+
+for i in range(7,10):
+    foldmat=scipy.io.loadmat('fold{}_with_irregwin.mat'.format(i))
+    valid_data=np.concatenate((valid_data,foldmat['ob']),axis=0)
+    valid_labels=np.concatenate((valid_labels,utils.onehot(np.transpose(foldmat['lb']),num_classes)),axis=0)
+valid_data=np.expand_dims(valid_data,axis=-1)
+
+#We test on fold10
+
+
+#Training loss and accuracy for each epoch
 train_loss, train_accuracy = [], []
+#Training loss and accuracy within an epoch (is erased at every new epoch)
+_train_loss, _train_accuracy = [], []
+valid_loss, valid_accuracy = [], []
 test_loss, test_accuracy = [], []
-
 saver = tf.train.Saver() # defining saver function
+
+#Cross validation parameters
+n_fold=10
 
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
+    #Cross-validation
+    #for cv in range(n_fold):
+
     print('Begin training loop')
     try:
-        while (epoch <= max_epochs):
-            batch_data, batch_labels = training_loader.next_batch()
-            ### TRAINING ###
-            # what to feed to our train_op
-            # notice we onehot encode our predictions to change shape from (batch,) -> (batch, num_output)
-            feed_dict_train = {x_pl: batch_data, y_pl: batch_labels}
 
+        ### TRAINING ###
+        while (epoch < max_epochs):
+            train_batch_data, train_batch_labels = train_loader.next_batch()
+            feed_dict_train = {x_pl: train_batch_data, y_pl: train_batch_labels}
             # deciding which parts to fetch, train_op makes the classifier "train"
             fetches_train = [train_op, cross_entropy, accuracy]
-
-            # running the train_op
+            # running the train_op and computing the updated training loss and accuracy
             res = sess.run(fetches=fetches_train, feed_dict=feed_dict_train)
             # storing cross entropy (second fetch argument, so index=1)
-            train_loss += [res[1]]
-            train_accuracy += [res[2]]
+            _train_loss += [res[1]]
+            _train_accuracy += [res[2]]
 
             ### VALIDATING ###
-            batch_data, batch_labels = test_loader.next_batch();
-            # what to feed our accuracy op
-            feed_dict_valid = {x_pl: batch_data, y_pl : batch_labels}
+            #When we reach the last mini-batch of the epoch
+            if train_loader.is_epoch_done():
+                # what to feed our accuracy op
+                feed_dict_valid = {x_pl: valid_data, y_pl : valid_labels}
+                # deciding which parts to fetch
+                fetches_valid = [cross_entropy, accuracy]
+                # running the validation
+                res = sess.run(fetches=fetches_valid, feed_dict=feed_dict_valid)
+                #Update all accuracies
+                valid_loss += [res[0]]
+                valid_accuracy += [res[1]]
+                train_loss+=[np.mean(_train_loss)]
+                train_accuracy+=[np.mean(_train_accuracy)]
+                # Reinitialize the intermediate loss and accuracy within epochs
+                _train_loss, _train_accuracy = [], []
+                #Print a summary of the training and validation
+                print("Epoch {} : Train Loss {:6.3f}, Train acc {:6.3f},  Valid loss {:6.3f},  Valid acc {:6.3f}".format(
+                    epoch, train_loss[-1], train_accuracy[-1], valid_loss[-1], valid_accuracy[-1]))
 
-            # deciding which parts to fetch
-            fetches_valid = [cross_entropy, accuracy]
+                #Update epoch
+                epoch += 1;
+        #Test the training on a independent test set (relevant when we'll tune parameters using the validation set/do early stopping)
+        test_epoch = epoch
+        # while mnist_data.test.epochs_completed == test_epoch:
+        #     x_batch, y_batch = mnist_data.test.next_batch(batch_size)
+        #     feed_dict_test = {x_pl: x_batch, y_pl: y_batch}
+        #     _loss, _acc = sess.run(fetches_valid, feed_dict_test)
+        #     test_loss.append(_loss)
+        #     test_accuracy.append(_acc)
 
-            # running the validation
-            res = sess.run(fetches=fetches_valid, feed_dict=feed_dict_valid)
-            test_loss += [res[0]]
-            test_accuracy += [res[1]]
-            epoch += 1;
-            print("completed %d epochs." % epoch)
         whatever = 1000
-        save_path = saver.save(sess, "the_saved_model", global_step=whatever) # hopefully works for GBAR and on your local computer
-        print("model saved under the path: ", save_path)
+        #save_path = saver.save(sess, "the_saved_model", global_step=whatever) # hopefully works for GBAR and on your local computer
+        #print("model saved under the path: ", save_path)
     except KeyboardInterrupt:
         pass
 
