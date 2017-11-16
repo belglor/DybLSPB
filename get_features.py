@@ -1,120 +1,106 @@
-import numpy as np
-import librosa
-import matplotlib.pyplot as plt
-import os
-import scipy.io
-from parse import *
-
 #======= ADJUSTABLE PARAMETERS ================================================
-fold_num = 1 #change this to fit the fold number
-whole_audios = True #if True, every audio contributes exactly one observation, therefore the length varies
+num_total_folds = 10
+whereAreTheFiles = "UrbanSound8K/audio/" #directory that contains the FOLDERS "fold1", "fold2" ... "fold10"
+where2SaveIt = "" # "" to save it in the same location as the code, otherwise "path/to/folder/"
+silence_threshold = -70.0 #the value that Karol uses
+name_verite = ""
 #==============================================================================
 
+import numpy as np
+import librosa
+#import matplotlib.pyplot as plt
+import os
+import scipy.io
+from parse import parse
 
-direc = "UrbanSound8K/audio/fold" + str(fold_num)
-audiofiles = os.listdir(direc)
+FRAMES_PER_SEGMENT = 41  # 41 frames ~= 950 ms segment length @ 22050 Hz
+TIME_WINDOW_SIZE = 512 * FRAMES_PER_SEGMENT   # 23 ms per frame @ 22050 Hz #gives the 950ms from Piczak 
+STEP_SIZE = 512 * FRAMES_PER_SEGMENT // 2
 
-audiofiles.remove(".DS_Store")
-
+sampl_freq_Hz = 22050
 num_classes = 10
-N =len(audiofiles)
 img_height = 60
+img_width = 41 
 fft_window_len = 1024
-segment_len = 41 #in samples
-print("length of FFT window (seconds): ", float(fft_window_len)/22050)
-print("length of FFT segment (seconds): ", segment_len*float(.5*fft_window_len)/22050)
-num_channels = 2 #the spectrogram and the deltas
+N_vec = np.zeros(num_total_folds, np.float64)
+N2_vec = np.zeros(num_total_folds, np.float64)
+tooShortList_mat = np.zeros((num_total_folds, num_classes), np.float64)
+classPriorsRaw_mat = np.zeros((num_total_folds, num_classes), np.float64)
+classPriorsBeforeWindowing_mat = np.zeros((num_total_folds, num_classes), np.float64)
+classPriorsAfterWindowing_mat = np.zeros((num_total_folds, num_classes), np.float64)
 
-#thedata = np.zeros((N, num_channels, img_height, img_width), np.float64)
-#get the lengths of the respective audio sequences
-clip_len = np.zeros(N, np.float64)
-if whole_audios:
-    labels = np.zeros(N, int)
-    observations = np.zeros((N, segment_len), np.float64)
-labels = np.zeros(0, int)
-observations = np.zeros((0, img_height, segment_len), np.float64)
+for fold_num in np.arange(1,num_total_folds+1):
+    print("")
+    print("-----------------------------------------------------------")
+    print("------------- FOLD %d -------------------------------------" %fold_num)
+    print("-----------------------------------------------------------")
+    direc = whereAreTheFiles + "fold" + str(fold_num)
+    audiofiles = os.listdir(direc)
+    audiofiles.remove(".DS_Store")
+    too_quiet_ctr = 0
+    N =len(audiofiles)
+    N_vec[fold_num-1] = N
+    clip_len = np.zeros(N, np.float64) #get the lengths of the respective audio sequences
+    observations_wav = np.zeros((0, TIME_WINDOW_SIZE), np.float64)
+    observations_spcgm = np.zeros((0, img_height, img_width), np.float64)
+    labels = np.zeros(0, int)
+    num_too_short = 0 #number of audioclips that are too short to give even one observation
+    classPriorsRaw = np.zeros(num_classes, np.float64)
+    classPriorsBeforeWindowing = np.zeros(num_classes, np.float64)
+    classPriorsAfterWindowing = np.zeros(num_classes, np.float64)
+    
+    for n, au in enumerate(audiofiles):
+        tmp = parse("{}-{}-{}-{}.wav", au)
+        label_for_file = int(tmp[1])
+        classPriorsRaw[label_for_file] += 1
+        print("processing soundfile {0} of {1}, label {3}, named {2}".format(n, N, au, label_for_file))
+        audioclip, _ = librosa.load(direc + "/" + au, sr=sampl_freq_Hz)
+        clip_len[n] = len(audioclip)
+        classPriorsBeforeWindowing[label_for_file] += 1
+        normalization_factor = 1.0 / np.max(np.abs(audioclip)) #how Karol does it
+        audioclip *= normalization_factor #how Karol does it
+        s = 0
+        while True:
+            window_wav = audioclip[(s * STEP_SIZE):(s * STEP_SIZE + TIME_WINDOW_SIZE)] #how Karol does it
+            s+=1            
+            if len(window_wav) < TIME_WINDOW_SIZE: break
+            window_spcgm = librosa.feature.melspectrogram(window_wav, hop_length=512, n_fft=fft_window_len, sr=sampl_freq_Hz, n_mels=img_height) #how Karol does it
+            window_spcgm = window_spcgm[:, :img_width] #for some reason the window_spcgm returned by window_spcgm has a width of 42 so we have to trim it to 41
+            window_spcgm = librosa.logamplitude(window_spcgm) #how Karol does it
+            if np.mean(window_spcgm) <= silence_threshold: #That's what Karol said
+                too_quiet_ctr += 1
+            else:
+                observations_spcgm = np.vstack((observations_spcgm, [window_spcgm]))
+                observations_wav = np.vstack((observations_wav, window_wav))
+                labels = np.hstack((labels, label_for_file)) #*np.ones(1, int)
+                classPriorsAfterWindowing[label_for_file] += 1
+    
+    tooShortList = classPriorsRaw - classPriorsBeforeWindowing
+    tooShortList_mat[fold_num-1] = tooShortList
+    classPriorsRaw /= N
+    classPriorsRaw_mat[fold_num-1] = classPriorsRaw
+    classPriorsBeforeWindowing /= N - np.sum(tooShortList)
+    classPriorsBeforeWindowing_mat[fold_num-1] = classPriorsBeforeWindowing
+    N2 = np.shape(observations_wav)[0]
+    N2_vec[fold_num-1] = N2
+    classPriorsAfterWindowing /= N2
+    classPriorsAfterWindowing_mat[fold_num-1] = classPriorsAfterWindowing
+    print("augmented from {0} to {1} observations.".format(N, N2) )
+    print("{0} observations (after windowing) were silent and therefore discarded.".format(too_quiet_ctr))
+    name = where2SaveIt + "fold%d"%fold_num    
+    scipy.io.savemat(name + name_verite + "_spcgm.mat", dict(ob_spcgm = observations_spcgm) )
+    scipy.io.savemat(name + name_verite + "_wav.mat", dict(ob_wav = observations_wav) )
+    scipy.io.savemat(name + name_verite + "_labels.mat", dict(lb = labels) )
+    scipy.io.savemat(name + name_verite + "_stats.mat", 
+     dict(clipLen = clip_len, N=N, N2=N2, tooShortList = tooShortList, classPriorsRaw =classPriorsRaw, 
+          classPriorsBeforeWindowing = classPriorsBeforeWindowing,
+          classPriorsAfterWindowing = classPriorsAfterWindowing)  )
+    print("observations and labels were saved in")
+    print(name + name_verite + "_spcgm.mat")
+    print(name + name_verite + "_wav.mat")
+    print(name + name_verite + "_labels.mat")
 
-num_too_short = 0 #number of audioclips that are too short to give even one observation
-classPriorsRaw = np.zeros(num_classes, np.float64)
-classPriorsBeforeWindowing = np.zeros(num_classes, np.float64)
-classPriorsAfterWindowing = np.zeros(num_classes, np.float64)
-
-def windowing(spcgm):
-    s1 = segment_len // 2
-    sp_len = np.shape(spcgm)[1]
-    sp_hei = np.shape(spcgm)[0]
-    nwins = 2*(sp_len // segment_len)-1
-    irregular_window = True #will happen nearly always
-    rest_at_the_end = sp_len % segment_len
-    if rest_at_the_end == s1: #everything fits perfectly
-        extra_windows = 1
-        irregular_window = False
-    elif rest_at_the_end == 0: #everything fits perfectly
-        extra_windows = 0
-        irregular_window = False
-    elif rest_at_the_end < s1: extra_windows = 1
-    elif rest_at_the_end > s1: extra_windows = 2
-    nwins += extra_windows  
-
-    theWindows = np.zeros((nwins, sp_hei, segment_len), np.float64)
-    if irregular_window:
-        win_range=nwins-1
-    else:
-        win_range=nwins
-    for ro in range(win_range):
-        if ro%2 == 0:
-            startpos = (ro//2)*segment_len
-        else:
-            startpos = (ro//2)*segment_len+s1
-        mask = np.arange(startpos, startpos+segment_len)
-        theWindows[ro] = spcgm[:, mask]
-
-    if irregular_window:
-        mask=np.arange(sp_len-segment_len,sp_len)
-        theWindows[-1]=spcgm[:,mask]
-    return theWindows, nwins
-
-for n, au in enumerate(audiofiles):
-    tmp = parse("{}-{}-{}-{}.wav", au)
-    label_for_file = int(tmp[1])
-    classPriorsRaw[label_for_file] += 1
-    print("processing soundfile {0} of {1}, label {3}, named {2}".format(n, N, au, label_for_file))
-    y, sr = librosa.load(direc + "/" + au)
-    clip_len[n] = len(y)
-    S = librosa.feature.melspectrogram(y, hop_length=512,
-                                       n_fft=fft_window_len, sr=sr, n_mels=img_height)
-    log_S = librosa.power_to_db(S, ref=np.max)
-    if np.shape(log_S)[1] < segment_len: continue
-    classPriorsBeforeWindowing[label_for_file] += 1
-    new_wins, n_new_wins = windowing(log_S)
-    classPriorsAfterWindowing[label_for_file] += n_new_wins
-#    print("label: " + tmp[1] + "\tlen (time samples)" + str(len(y)) + "\tnum obs. augm. from it: " + str(n_new_wins))
-    observations = np.vstack((observations, new_wins))
-    labels = np.hstack((labels, label_for_file*np.ones(n_new_wins, int) ))
-
-tooShortList = classPriorsRaw - classPriorsBeforeWindowing
-classPriorsRaw /= N
-classPriorsBeforeWindowing /= N - np.sum(tooShortList)
-N2 = np.shape(observations)[0]
-classPriorsAfterWindowing /= N2
-print("augmented from {0} to {1} observations.".format(N, N2) )
-print("classPriorsBeforeWindowing: ", classPriorsBeforeWindowing)
-print("classPriorsAfterWindowing: ", classPriorsAfterWindowing)
-
-plt.hist(clip_len)
-scipy.io.savemat("UrbanSound8K/fold%d_with_irregwin.mat"%fold_num, 
-                 dict(N=N, N2=N2, ob = observations, 
-                      lb = labels, tooShortList = tooShortList, classPriorsRaw =classPriorsRaw, 
-                      classPriorsBeforeWindowing = classPriorsBeforeWindowing,
-                      classPriorsAfterWindowing = classPriorsAfterWindowing
-                      )
-                 )
-
-#small test
-#file_idx = 870
-#ob_idx = np.arange(5425, 5432)
-#y, sr = librosa.load(direc + "/" + audiofiles[file_idx])
-#S = librosa.feature.melspectrogram(y, hop_length=512,
-#                                   n_fft=fft_window_len, sr=sr, n_mels=img_height)
-#log_S = librosa.power_to_db(S, ref=np.max)
-#scipy.io.savemat("UrbanSound8K/870.mat", dict(ob = observations[ob_idx], full = log_S))
+scipy.io.savemat(where2SaveIt + "allfolds" + name_verite + "_stats.mat", 
+ dict(N=N_vec, N2=N2_vec, tooShortList = tooShortList_mat, classPriorsRaw =classPriorsRaw_mat, 
+      classPriorsBeforeWindowing = classPriorsBeforeWindowing_mat,
+      classPriorsAfterWindowing = classPriorsAfterWindowing_mat)  )
