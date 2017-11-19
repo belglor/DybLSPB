@@ -186,16 +186,15 @@ with tf.variable_scope('performance'):
     # averaging the one-hot encoded vector
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-# Add ops to save and restore all the variables.
 saver = tf.train.Saver()
 
 save_path="./saved_models/piczak_150.ckpt-150"
-with tf.Session() as sess:
-    saver.restore(sess, save_path)
+with tf.Session() as first_restore_session:
+    saver.restore(first_restore_session, save_path)
     tf.trainable_variables()
     # Check some variables from loaded model
     variables_names =[v.name for v in tf.trainable_variables()]   # get all trainable shit from piczak
-    var_value=sess.run(variables_names)                           # run them through session and save value
+    var_value= first_restore_session.run(variables_names)                           # run them through session and save value
     index = 0
     for k,v in zip(variables_names, var_value):
         print("---------trainable stuff {0}: {1}------------------".format(index, k))
@@ -204,5 +203,23 @@ with tf.Session() as sess:
         print("")
         print("")
         index+=1
-    
+    what_we_want_to_train = list()
+    for stuff in tf.trainable_variables()[0:2]: #we want to update only the first Piczak Layer (Kernel and Bias, ergo 2 elements in the list) 
+        what_we_want_to_train.append(stuff)
+
+print("from now on, only this will be updated: ", what_we_want_to_train)
+
+################################################
+############### LOOK AT ME #####################
+################################################   
+#the list 
+#what_we_want_to_train
+#can now be given to the function
+#sgd.minimize(),
+#like in:
+#sgd.minimize(cross_entropy, var_list = what_we_want_to_train)
+################################################
+############### THANKS FOR LOOKING! ############
+################################################   
+ 
                                                      
