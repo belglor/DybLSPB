@@ -189,7 +189,7 @@ with tf.variable_scope('performance'):
 # Add ops to save and restore all the variables.
 saver = tf.train.Saver()
 
-save_path="./saved_models/the_saved_model.ckpt-1000"
+save_path="./saved_models/piczak_150.ckpt-150"
 with tf.Session() as sess:
   saver.restore(sess, save_path)
   tf.trainable_variables()
