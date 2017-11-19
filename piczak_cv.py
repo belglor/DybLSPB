@@ -317,13 +317,12 @@ with tf.Session() as sess:
             #     _loss, _acc = sess.run(fetches_valid, feed_dict_test)
             #     test_loss.append(_loss)
             #     test_accuracy.append(_acc)
-
+        save_path = saver.save(sess, "./saved_models/piczak_150.ckpt",global_step=150)  # hopefully works for GBAR and on your local computer
             # whatever = 1000
     except KeyboardInterrupt:
         pass
 
-save_path = saver.save(sess, "./saved_models/piczak_150.ckpt",
-                       global_step=150)  # hopefully works for GBAR and on your local computer
+
 print("model saved under the path: ", save_path)
 
 #Saving stuff
