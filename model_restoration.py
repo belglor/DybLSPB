@@ -191,10 +191,18 @@ saver = tf.train.Saver()
 
 save_path="./saved_models/piczak_150.ckpt-150"
 with tf.Session() as sess:
-  saver.restore(sess, save_path)
-  tf.trainable_variables()
-  # Check some variables from loaded model
-  variables_names =[v.name for v in tf.trainable_variables()]   # get all trainable shit from piczak
-  var_value=sess.run(variables_names)                           # run them through session and save value
-  for k,v in zip(variables_names, var_value):                   # print that shit
-    print(k, v)                                                 
+    saver.restore(sess, save_path)
+    tf.trainable_variables()
+    # Check some variables from loaded model
+    variables_names =[v.name for v in tf.trainable_variables()]   # get all trainable shit from piczak
+    var_value=sess.run(variables_names)                           # run them through session and save value
+    index = 0
+    for k,v in zip(variables_names, var_value):
+        print("---------trainable stuff {0}: {1}------------------".format(index, k))
+        print(v) #e.g. the saved weights/kernel elements
+        print("------------------------------------------------------------------")
+        print("")
+        print("")
+        index+=1
+    
+                                                     
