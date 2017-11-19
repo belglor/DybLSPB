@@ -88,14 +88,18 @@ with tf.variable_scope('convLayer1'):
     print('conv1 \t\t', z1.get_shape())                     
                             
     ### MAX_POOL1
-    pool1 = tf.layers.MaxPooling1D(    pool_size=pool_size_1,
+    # For tf v1.3, use max_pooling1d instead of MaxPooling1D which is for v1.4
+    # works the same, even same arguments, but MaxPooling1D creates a layer that is 
+    # later applied on z1, while max_pooling1d takes the conv layer data as argument too
+    a1 = tf.layers.max_pooling1d(    inputs = z1,
+                                    pool_size=pool_size_1,
                                     strides=strides_pool1,
                                     padding=padding_pool1, 
                                     name='pool_1'
                                 )
                                    
     # Activation pass, pooling
-    a1 = (pool1(z1));
+    #a1 = (pool1(z1));
     print('pool1 \t\t', a1.get_shape())
     
 with tf.variable_scope('convLayer2'):    
@@ -125,39 +129,15 @@ with tf.variable_scope('convLayer2'):
     print('conv2 \t\t', z2.get_shape())                     
                             
     ### MAX_POOL2
-    pool2 = tf.layers.MaxPooling1D(    pool_size=pool_size_2,
+    a2 = tf.layers.max_pooling1d(   inputs  = z2,
+                                    pool_size=pool_size_2,
                                     strides=strides_pool2,
                                     padding=padding_pool2, 
                                     name='pool_2'
                                 )
                                    
     # Activation pass, pooling
-    a2 = (pool2(z2));
+    #a2 = (pool2(z2));
     print('pool2 \t\t', a2.get_shape())
-    
-#   conv1 = Conv1D(filters_1, kernel_size_1, strides=strides_conv1, padding=padding_conv1, activation='relu')
-#   print('x_pl_1 \t\t', x_pl_1.get_shape())
-#   x = conv1(x_pl_1)
-#   print('conv1 \t\t', x.get_shape())
-#
-#   pool1 = MaxPooling1D(pool_size=pool_size_1, strides=strides_pool1, padding=padding_pool1)
-#   x = pool1(x)
-#   print('pool1 \t\t', x.get_shape())
-#   #x = flatten(x)
-#   #print('Flatten \t', x.get_shape())
-   
-#with tf.variable_scope('convLayer2'):
-#   conv2 = Conv1D(filters_2, kernel_size_2, strides=strides_conv2, padding=padding_conv2, activation='relu')
-#   #print('x_pl_2 \t\t', x_pl_2.get_shape())
-#   x2 = conv2(x)
-#   print('conv2 \t\t', x2.get_shape())
-#
-#   pool2 = MaxPooling1D(pool_size=pool_size_2, strides=strides_pool2, padding=padding_pool2)
-#   x2 = pool2(x2)
-#   print('pool2 \t\t', x2.get_shape())
-#   x2 = flatten(x2)
-#   print('Flatten \t', x2.get_shape())
 
 print('Model consits of ', utils.num_params(), 'trainable parameters.')
-
-
