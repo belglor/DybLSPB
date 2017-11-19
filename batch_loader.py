@@ -1,5 +1,8 @@
 ### DEFINE BATCH LOADER
-class batch_loader: 
+class batch_loader:
+    
+    import numpy as np
+    
 # =============================================================================
 #     # Variables
 #     batch_size = 0
@@ -12,6 +15,7 @@ class batch_loader:
 #     
 # =============================================================================
     def __init__(self, data, labels, batch_size):  
+        import numpy as np #even though this looks retarded, we have to do it to avoid error messages later on
         self.data = data
         self.labels = labels
         self.batch_idx = []
@@ -32,6 +36,7 @@ class batch_loader:
             
         
     def next_batch(self):
+        import numpy as np #even though this looks retarded, we have to do it to avoid error messages later on
         # If the epoch is finished, reshuffle the indexes and restart epoch
         if(self.end_epoch):  
             np.random.shuffle(self.idx)
@@ -61,6 +66,7 @@ class batch_loader:
         return self.end_epoch;
     
     def reset_loader(self):
+        import numpy as np #even though this looks retarded, we have to do it to avoid error messages later on
         self.batch_idx = [];
         self.epoch_idx = 0;
         self.end_epoch = True;
