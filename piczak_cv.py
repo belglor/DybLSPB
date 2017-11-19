@@ -16,21 +16,8 @@ from tensorflow.contrib.layers import fully_connected, convolution2d, flatten, b
 from tensorflow.python.ops.nn import relu, elu, relu6, sigmoid, tanh, softmax
 from tensorflow.python.ops.nn import dynamic_rnn
 
-tf.reset_default_graph()
-
-# Random seed for reproducibility
-np.random.seed(1337)
-
-from sklearn.model_selection import StratifiedKFold
-
-X = np.array([[1, 2], [3, 4], [1, 2], [3, 4]])
-y = np.array([1, 2, 3, 4])
-kf = KFold(n_splits=2)
-kf.get_n_splits(X)
-print(kf)
-KFold(n_splits=2, random_state=None, shuffle=False)
-for train_index, test_index in kf.split(X):
-    print("TRAIN:", train_index, "TEST:", test_index)
+# # Random seed for reproducibility
+# np.random.seed(1337)
 
 #bands : related to frequencies. Frames : related to audio sequence. 2 channels (the spec and the delta's)
 bands, frames, n_channels = 60, 41, 1
@@ -85,7 +72,7 @@ num_classes=10
 l2_output=0.001
 
 #Learning rate
-learning_rate=0.001
+learning_rate=0.01
 momentum=0.9
 
 tf.reset_default_graph()
@@ -219,8 +206,7 @@ print('Forward pass successful!')
 
 # Batch shit
 batch_size = 1000
-max_epochs = 1
-epoch=0
+max_epochs = 150
 
 #Folds creation : lists with all the np.array's inside
 data_folds=[]
@@ -235,31 +221,53 @@ for i in range(1,11):
     #One-hot encoding labels
     labels_folds.append(labels_mat)
 
-#Training loss and accuracy for each epoch
-train_loss, train_accuracy = [], []
-#Training loss and accuracy within an epoch (is erased at every new epoch)
-_train_loss, _train_accuracy = [], []
-valid_loss, valid_accuracy = [], []
-test_loss, test_accuracy = [], []
 saver = tf.train.Saver() # defining saver function
 
-#Cross validation parameters
+#Cross validation parameter
 n_fold=10
+#Initialization of values over folds
+train_loss_cv = np.zeros((n_fold,max_epochs))
+train_accuracy_cv = np.zeros((n_fold,max_epochs))
+valid_loss_cv = np.zeros((n_fold,max_epochs))
+valid_accuracy_cv = np.zeros((n_fold,max_epochs))
 
 with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
     #Cross-validation
-    #for cv in range(n_fold):
-
-    print('Begin training loop')
     try:
-        #Cross-validation
-        for k in range(n_fold):
-            mask=[True]*n_fold
-            mask[k]=False
-            train_data=[data_folds[i] for i in range(len(mask)) if mask[i]]
-            train_labels=[labels_folds[i] for i in range(len(mask)) if mask[i]]
-            train_loader = bl.batch_loader(train_data, train_labels, batch_size)
+        #Cross-validation loop
+        #for k in range(n_fold):
+        #10th fold to test (here validation)
+        k=9
+        print('Begin training loop',k)
+        #We reinitialize the weights
+        sess.run(tf.global_variables_initializer())
+        epoch = 0
+
+        mask=[True]*n_fold
+        mask[k]=False
+        train_data=[data_folds[i] for i in range(len(mask)) if mask[i]]
+        train_labels=[labels_folds[i] for i in range(len(mask)) if mask[i]]
+        #Merging data (list being different from np.arrays)
+        merged_train_data=np.empty((0,bands,frames,n_channels))
+        merged_train_labels=np.empty((0,num_classes))
+        for i_merge in range(n_fold-1):
+            merged_train_data=np.append(merged_train_data,data_folds[i_merge],axis=0)
+            merged_train_labels=np.append(merged_train_labels,labels_folds[i_merge],axis=0)
+
+        train_data=merged_train_data
+        train_labels=merged_train_labels
+
+        train_loader = bl.batch_loader(train_data, train_labels, batch_size)
+
+        valid_data=data_folds[k]
+        valid_labels=labels_folds[k]
+
+        # Training loss and accuracy for each epoch : initialization
+        train_loss, train_accuracy = [], []
+        # Training loss and accuracy within an epoch (is erased at every new epoch)
+        _train_loss, _train_accuracy = [], []
+        valid_loss, valid_accuracy = [], []
+        test_loss, test_accuracy = [], []
 
         ### TRAINING ###
         while (epoch < max_epochs):
@@ -293,25 +301,38 @@ with tf.Session() as sess:
                 print("Epoch {} : Train Loss {:6.3f}, Train acc {:6.3f},  Valid loss {:6.3f},  Valid acc {:6.3f}".format(
                     epoch, train_loss[-1], train_accuracy[-1], valid_loss[-1], valid_accuracy[-1]))
 
+                #Update the cross validation results
+                train_loss_cv[k,epoch]=train_loss[-1]
+                train_accuracy_cv[k,epoch]=train_accuracy[-1]
+                valid_loss_cv[k,epoch]=valid_loss[-1]
+                valid_accuracy_cv[k,epoch]=valid_accuracy[-1]
+
                 #Update epoch
                 epoch += 1;
-        #Test the training on a independent test set (relevant when we'll tune parameters using the validation set/do early stopping)
-        test_epoch = epoch
-        # while mnist_data.test.epochs_completed == test_epoch:
-        #     x_batch, y_batch = mnist_data.test.next_batch(batch_size)
-        #     feed_dict_test = {x_pl: x_batch, y_pl: y_batch}
-        #     _loss, _acc = sess.run(fetches_valid, feed_dict_test)
-        #     test_loss.append(_loss)
-        #     test_accuracy.append(_acc)
+            # #Test the training on a independent test set (relevant when we'll tune parameters using the validation set/do early stopping)
+            #test_epoch = epoch
+            # while mnist_data.test.epochs_completed == test_epoch:
+            #     x_batch, y_batch = mnist_data.test.next_batch(batch_size)
+            #     feed_dict_test = {x_pl: x_batch, y_pl: y_batch}
+            #     _loss, _acc = sess.run(fetches_valid, feed_dict_test)
+            #     test_loss.append(_loss)
+            #     test_accuracy.append(_acc)
 
-        whatever = 1000
-        save_path = saver.save(sess, "./saved_models/the_saved_model.ckpt", global_step=whatever) # hopefully works for GBAR and on your local computer
-        print("model saved under the path: ", save_path)
+            # whatever = 1000
     except KeyboardInterrupt:
         pass
 
-epoch = np.arange(len(train_loss))
-#TODO: fix this
+save_path = saver.save(sess, "./saved_models/piczak_150.ckpt",
+                       global_step=150)  # hopefully works for GBAR and on your local computer
+print("model saved under the path: ", save_path)
+
+#Saving stuff
+#mdict={'train_loss_cv':train_loss_cv,'train_accuracy_cv':train_accuracy_cv,'valid_loss_cv':valid_loss_cv,'valid_accuracy_cv':valid_accuracy_cv}
+mdict={'train_loss':train_loss,'train_accuracy':train_accuracy,'valid_loss':valid_loss,'valid_accuracy':valid_accuracy}
+
+scipy.io.savemat('piczak_cv.mat',mdict)
+
+        #TODO: fix this
 #plt.figure()
 #plt.plot(epoch, train_accuracy,'r', epoch, valid_accuracy,'b')
 #plt.legend(['Train Acc','Val Acc'], loc=4)
