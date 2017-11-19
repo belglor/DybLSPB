@@ -209,15 +209,79 @@ with tf.Session() as first_restore_session:
 
 print("from now on, only this will be updated: ", what_we_want_to_train)
 
+np.random.seed(43) # 42 is mainstream
+x_dummy = np.random.normal(0, 1, [1337,60,41,1]).astype('float32') #dummy data
+y_dummy = utils.onehot(np.random.uniform(0, 10, [1337]).astype('int32'), 10 ) #dummy labels
+# please use the SAME random data and labels in all the 4 sessions below, for comparison 
+
+TF_RAND_SEED = 666 # needed, since TF cares not about the numpy random seed above
+tf.set_random_seed(TF_RAND_SEED)
+print("")
+print("+++++++++++++++++++++++++++++++++++")
+print("fully trainable network, run (1/2)")
+with tf.Session() as uber_session:
+    saver.restore(uber_session, save_path)
+    tf.set_random_seed(TF_RAND_SEED)
+    fetches_train = [train_op, cross_entropy, accuracy]
+    res = uber_session.run(fetches=fetches_train, feed_dict={x_pl: x_dummy, y_pl:y_dummy})
+    print("res train_op: ", res[0])
+    print("res cross_entropy: ", res[1])
+    print("res accuracy: ", res[2])
+    
+print("")
+print("do the exact same thing again, to check whether the TF random seeding works")
+print("+++++++++++++++++++++++++++++++++++")
+print("fully trainable network, run (2/2)")    
+with tf.Session() as uber_session2:
+    saver.restore(uber_session2, save_path)
+    tf.set_random_seed(TF_RAND_SEED)
+    fetches_train = [train_op, cross_entropy, accuracy]
+    res = uber_session2.run(fetches=fetches_train, feed_dict={x_pl: x_dummy, y_pl:y_dummy})
+    print("res train_op: ", res[0])
+    print("if this is now different, the random seeding does NOT work the way we want")
+    print("res cross_entropy: ", res[1])
+    print("res accuracy: ", res[2])
+
+print("")
+print("+++++++++++++++++++++++++++++++++++")
+print("network with only first layer trainable, run (1/2)")
+with tf.Session() as uber_session:
+    saver.restore(uber_session, save_path)
+    tf.set_random_seed(TF_RAND_SEED)
+    train_op.var_list = what_we_want_to_train #does this line solve our problem?? if not, how to do it properly?? ask the TA
+    fetches_train = [train_op, cross_entropy, accuracy]
+    res = uber_session.run(fetches=fetches_train, feed_dict={x_pl: x_dummy, y_pl:y_dummy})
+    print("res train_op: ", res[0])
+    print("res cross_entropy: ", res[1])
+    print("res accuracy: ", res[2])
+    
+print("")
+print("do the exact same thing again, to check whether the TF random seeding works")
+print("+++++++++++++++++++++++++++++++++++")
+print("network with only first layer trainable, run (2/2)")    
+with tf.Session() as uber_session2:
+    saver.restore(uber_session2, save_path)
+    tf.set_random_seed(TF_RAND_SEED)
+    train_op.var_list = what_we_want_to_train #does this line solve our problem?? if not, how to do it properly?? ask the TA
+    fetches_train = [train_op, cross_entropy, accuracy]
+    res = uber_session2.run(fetches=fetches_train, feed_dict={x_pl: x_dummy, y_pl:y_dummy})
+    print("res train_op: ", res[0])
+    print("res cross_entropy: ", res[1])
+    print("res accuracy: ", res[2])
+
 ################################################
 ############### LOOK AT ME #####################
 ################################################   
+
 #the list 
 #what_we_want_to_train
-#can now be given to the function
+#can normally (when no session restoring is done) be given to the function
 #sgd.minimize(),
 #like in:
 #sgd.minimize(cross_entropy, var_list = what_we_want_to_train)
+
+#but how to do it if session restoring is used??? ask the TA!
+
 ################################################
 ############### THANKS FOR LOOKING! ############
 ################################################   
