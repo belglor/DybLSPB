@@ -19,9 +19,10 @@ from tensorflow.python.ops.nn import dynamic_rnn
 loaded_outputlayer_kernel = np.array( [ np.arange(0, 50, .01) ] )
 loaded_outputlayer_kernel = loaded_outputlayer_kernel.repeat(10, axis=0)
 loaded_outputlayer_kernel = loaded_outputlayer_kernel.T
-
+loaded_outputlayer_kernel2 = -1337*np.ones((5000, 10), np.float32)
 #loaded_outputlayer_kernel_as_tensor = tf.Variable(loaded_outputlayer_kernel, name="loaded", dtype=tf.float32) 
-loaded_outputlayer_kernel_as_tensor = tf.constant_initializer(loaded_outputlayer_kernel)
+loaded_outputlayer_kernel_as_tensor = tf.constant_initializer(loaded_outputlayer_kernel2)
+WHERE_IS_OUTPUTLAYER_KERNEL = 8
 
 tf.reset_default_graph()
 
@@ -78,7 +79,7 @@ num_classes=10
 l2_output=0.001
 
 #Learning rate
-learning_rate=0.001
+learning_rate=0.5 #just to make things more visible 0.001
 momentum=0.9
 
 tf.reset_default_graph()
@@ -183,7 +184,7 @@ with tf.variable_scope('loss'):
 what_we_want_to_train = list()
 for stuff in tf.trainable_variables()[0:2]: #we want to update only the first Piczak Layer (Kernel and Bias, ergo 2 elements in the list) 
     what_we_want_to_train.append(stuff)
-print("what_we_want_to_train: ", what_we_want_to_train)
+print("what_we_want_to_train: ", what_we_want_to_train)                                              
 
 with tf.variable_scope('training'):
     # defining our optimizer
@@ -208,32 +209,27 @@ tf.set_random_seed(TF_RAND_SEED) #we have still no idea how to use this correctl
 print("")
 print("+++++++++++++++++++++++++++++++++++")
 with tf.Session() as the_session:
-    print("######### DUMMY FWD PASS")
-    the_session.run(tf.global_variables_initializer())
-    tf.set_random_seed(TF_RAND_SEED)
-#    print("HOLY MOLY all my variables ", the_session.run(tf.global_variables()))    
-#    print("the value of denseout ", the_session.run(tf.read_value(dense_out)  ))
-    print("TODO: code this")    
-    print("")
-    print("random seed not working (run this code several times)")
-    print("")
     print("######### DUMMY TRAINING")
+    print("-------------------------------")
     print("---when we update all weights:")
+    print("-------------------------------")
     tf.set_random_seed(TF_RAND_SEED)
     the_session.run(tf.global_variables_initializer())
-    fetches_train = [train_op_full, cross_entropy, accuracy]
-    res = the_session.run(fetches=fetches_train, feed_dict={x_pl: x_dummy, y_pl:y_dummy})
-    print("res train_op: ", res[0])
-    print("res cross_entropy: ", res[1])
-    print("res accuracy: ", res[2])
-    print("---when we update only the wanted weights:")
-    tf.set_random_seed(TF_RAND_SEED)
-    the_session.run(tf.global_variables_initializer())
-    fetches_train = [train_op_partial, cross_entropy, accuracy]
-    res = the_session.run(fetches=fetches_train, feed_dict={x_pl: x_dummy, y_pl:y_dummy})
-    print("res train_op: ", res[0])
-    print("res cross_entropy: ", res[1])
-    print("res accuracy: ", res[2])
+    fetches_train = [train_op_full, cross_entropy]
+    print("the output layer kernel before training op run", the_session.run(tf.trainable_variables()[6].name) )
+    for _ in range(3): the_session.run(fetches=fetches_train, feed_dict={x_pl: x_dummy, y_pl:y_dummy})
     print("")
-    print("Looks nice, but does it really work...? --> we need good tests")
+    print("the output layer kernel AFTER training op run (should have changed)", the_session.run(tf.trainable_variables()[6].name) )
+    print("")
+    print("-------------------------------")
+    print("---when we update only the wanted weights:")
+    print("-------------------------------")
+    tf.set_random_seed(TF_RAND_SEED)
+    the_session.run(tf.global_variables_initializer())
+    fetches_train = [train_op_partial, cross_entropy]
+    print("the output layer kernel before training op run", the_session.run(tf.trainable_variables()[6].name) )
+    for _ in range(3): the_session.run(fetches=fetches_train, feed_dict={x_pl: x_dummy, y_pl:y_dummy})
+    print("")
+    print("the output layer kernel AFTER training op run (should NOT have changed)", the_session.run(tf.trainable_variables()[6].name) )
+
                                                      
