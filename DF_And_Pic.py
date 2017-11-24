@@ -275,7 +275,81 @@ with tf.variable_scope('PZ_output_layer'):
     y = tf.nn.softmax(dense_out)
     print('denseOut\t', y.get_shape())
     
-
 print('Model consits of ', utils.num_params(), 'trainable parameters.')
 
+#########################################
+###   SETTING VARIABLES TRAINABILITY  ###
+#########################################
+    
+### STORING TRAINABLE VARIABLES
+all_vars = list()
+for variabs in tf.trainable_variables():
+    all_vars.append(variabs) # Store all trainable variables in a list
+    
+### SLICING VARIABLES 
+# Deep Fourier training variables
+DF_trainables = all_vars[0:4];
 
+# Piczak (CNN) training variables
+PZ_CNN_trainables = all_vars[4:8];
+
+# Piczak (Fully Connected) training variables
+PZ_FullyC_trainables = all_vars[8:];
+
+### SETTING TRAINABILITY FLAGS
+DF_trainable = True;
+PZ_CNN_firstlayer_trainable = True; #in case we want to make only the first convlayer of Piczak trainable
+PZ_CNN_trainable = False;
+PZ_FullyC_trainable = False;
+
+### CREATING LIST OF VARIABLES TO TRAIN
+# NB!!! Please do not put PZ_CNN_firstlayer_trainable and PZ_CNN_trainable both to True (it will break)
+to_train = list();
+if(DF_trainable):
+    to_train.append(DF_trainables);
+if(PZ_CNN_trainable):
+    to_train.append(PZ_CNN_trainables)
+
+####################################################
+###   LOSS, TRAINING AND PERFORMANCE DEFINITION  ###
+####################################################
+
+with tf.variable_scope('loss'):
+    # computing cross entropy per sample
+    cross_entropy = -tf.reduce_sum(y_pl * tf.log(y+1e-8), reduction_indices=[1])
+    # averaging over samples
+    cross_entropy = tf.reduce_mean(cross_entropy)
+
+with tf.variable_scope('training'):
+    # defining our optimizer
+    sgd = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=momentum, use_nesterov=True)
+    # applying the gradients
+    train_op = sgd.minimize(cross_entropy,  var_list=what_we_want_to_train)
+
+with tf.variable_scope('performance'):
+    # making a one-hot encoded vector of correct (1) and incorrect (0) predictions
+    correct_prediction = tf.equal(tf.argmax(y, axis=1), tf.argmax(y_pl, axis=1))
+    # averaging the one-hot encoded vector
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    
+##############################
+###   FORWARD PASS TESTING ###
+##############################
+
+#Random audio images for testing
+#x_test_forward = np.random.normal(0, 1, [50,20992,1]).astype('float32') #dummy data
+#
+## restricting memory usage, TensorFlow is greedy and will use all memory otherwise
+#gpu_opts = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
+#
+#sess=tf.Session(config=tf.ConfigProto(gpu_options=gpu_opts))
+#sess.run(tf.global_variables_initializer())
+#feed_dict = {x_pl_1: x_test_forward}
+#res_forward_pass = sess.run(fetches=[y], feed_dict=feed_dict)
+#
+#print("y", res_forward_pass[0].shape)
+#print('Forward pass successful!')
+
+##########################
+###   TRAINING LOOP    ###
+##########################
