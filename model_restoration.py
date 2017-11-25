@@ -7,18 +7,19 @@ import tensorflow as tf
 import os
 import sys
 sys.path.append(os.path.join('.', '..'))
-import utils
 import batch_loader as bl
-import scipy
 from scipy import io
 from tensorflow.contrib.layers import fully_connected, convolution2d, flatten, batch_norm, max_pool2d, dropout
 from tensorflow.python.ops.nn import relu, elu, relu6, sigmoid, tanh, softmax
 from tensorflow.python.ops.nn import dynamic_rnn
 
-tf.reset_default_graph()
+# =============================================================================
+#in the long run, piczak should save its trained weights directly in .mat files with numpy arrays, making this script obsolete
+save_path="./saved_models/piczak_150.ckpt-150" #the trained Piczak weights will be loaded from here
+MatFile_path = "./saved_models/TRAINEDWEIGHTS_from_chkpt" 
+# =============================================================================
 
-# Random seed for reproducibility
-np.random.seed(1337)
+tf.reset_default_graph()
 
 #bands : related to frequencies. Frames : related to audio sequence. 2 channels (the spec and the delta's)
 bands, frames, n_channels = 60, 41, 1
@@ -72,21 +73,10 @@ num_classes=10
 #activation_output="softmax"
 l2_output=0.001
 
-#Learning rate
-learning_rate=0.001
-momentum=0.9
-
-tf.reset_default_graph()
-
 #Setting up the placeholders
 x_pl = tf.placeholder(tf.float32, [None, bands, frames,n_channels], name='xPlaceholder')
 y_pl = tf.placeholder(tf.float64, [None, num_classes], name='yPlaceholder')
 y_pl = tf.cast(y_pl, tf.float32)
-
-#Setting up the filters and weights to optimize
-print('Trace of the tensors shape as it is propagated through the network.')
-print('Layer name \t Output size')
-print('----------------------------')
 
 # Convolutional layers
 with tf.variable_scope('convLayer1'):
@@ -166,35 +156,24 @@ with tf.variable_scope('output_layer'):
     y = tf.nn.softmax(dense_out)
     print('denseOut\t', y.get_shape())
 
-print('Model consists of ', utils.num_params(), 'trainable parameters.')
-
-with tf.variable_scope('loss'):
-    # computing cross entropy per sample
-    cross_entropy = -tf.reduce_sum(y_pl * tf.log(y+1e-8), reduction_indices=[1])
-    # averaging over samples
-    cross_entropy = tf.reduce_mean(cross_entropy)
-
-with tf.variable_scope('training'):
-    # defining our optimizer
-    sgd = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=momentum, use_nesterov=True)
-    # applying the gradients
-    train_op = sgd.minimize(cross_entropy)
-
-with tf.variable_scope('performance'):
-    # making a one-hot encoded vector of correct (1) and incorrect (0) predictions
-    correct_prediction = tf.equal(tf.argmax(y, axis=1), tf.argmax(y_pl, axis=1))
-    # averaging the one-hot encoded vector
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-
 # Add ops to save and restore all the variables.
 saver = tf.train.Saver()
 
-save_path="./saved_models/piczak_150.ckpt-150"
 with tf.Session() as sess:
-  saver.restore(sess, save_path)
-  tf.trainable_variables()
-  # Check some variables from loaded model
-  variables_names =[v.name for v in tf.trainable_variables()]   # get all trainable shit from piczak
-  var_value=sess.run(variables_names)                           # run them through session and save value
-  for k,v in zip(variables_names, var_value):                   # print that shit
-    print(k, v)                                                 
+    saver.restore(sess, save_path)
+    tf.trainable_variables()
+    # Check some variables from loaded model
+    variables_names =[v.name for v in tf.trainable_variables()]   # get all trainable shit from piczak
+    var_value=sess.run(variables_names)                           # run them through session and save value
+    io.savemat(MatFile_path, dict(
+            conv2d_1_kernel = var_value[0],
+            conv2d_1_bias = var_value[1],
+            conv2d_2_kernel = var_value[2],
+            conv2d_2_bias = var_value[3],
+            dense_1_kernel = var_value[4],
+            dense_1_bias = var_value[5],
+            dense_2_kernel = var_value[6],
+            dense_2_bias = var_value[7],
+            output_kernel = var_value[8],
+            output_bias = var_value[9]
+            ) )
