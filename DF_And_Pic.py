@@ -28,7 +28,7 @@ PZ_2ndCNN_trainable = False
 PZ_FullyC_trainable = False
 
 # =============================================================================
-tw_PZ = scipy.io.loadmat("./saved_models/TRAINEDWEIGHTS_from_chkpt" )
+tw_PZ = scipy.io.loadmat("./saved_models/pic150_TRAINEDWEIGHTS_from_chkpt" ) #can be found on Google Drive
 # =============================================================================
 
 ################################

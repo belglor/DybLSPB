@@ -1,28 +1,54 @@
 from __future__ import absolute_import, division, print_function
+import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 import tensorflow as tf
 import os
-import sys
 sys.path.append(os.path.join('.', '..'))
 import utils
 import batch_loader as bl
 import scipy
 from scipy import io
+import time
 
 from tensorflow.contrib.layers import fully_connected, convolution2d, flatten, batch_norm, max_pool2d, dropout
 from tensorflow.python.ops.nn import relu, elu, relu6, sigmoid, tanh, softmax
 from tensorflow.python.ops.nn import dynamic_rnn
-
-# # Random seed for reproducibility
-# np.random.seed(1337)
+########################################
+n_fold=10
+if len(sys.argv) == 2:       #if you run the script in the CMD/shell like 
+                             # python3 piczak_cv.py FAST
+    if sys.argv[1] == "FAST": 
+        RUN_FAST = True
+        CV_TEST_FOLDS = [1, 6]
+        print("running in fast mode (not much data).")
+    else: 
+        RUN_FAST = False
+        try: CV_TEST_FOLDS = [int(sys.argv[1])] # python3 piczak_cv.py 3 --> test only on fold 3
+        except ValueError: CV_TEST_FOLDS = range(n_fold)       
+else: #if you run the script "normally" from Pycharm, Spyder or shell 
+    RUN_FAST = False
+    # True: run only with a few data and not all CV folds, just to check
+    # False [default]: run everything (same behaviour as before)  
+    CV_TEST_FOLDS = range(n_fold)    
+#Cross validation parameter
+if RUN_FAST: 
+    max_epochs = 2
+else: 
+    max_epochs = 300
+batch_size = 1000
+directory = "./trained_models/piczak_{0}/".format(max_epochs)
+save_path_perf = directory + "performance"
+save_path_numpy_weights = directory + "trainedweights"
+if RUN_FAST: save_path_numpy_weights += "_FAST"
+########################################
+print("CV: will test on folds ", CV_TEST_FOLDS)
 
 #bands : related to frequencies. Frames : related to audio sequence. 2 channels (the spec and the delta's)
 bands, frames, n_channels = 60, 41, 1
 image_shape = [bands,frames,n_channels]
-
 ### First convolutional ReLU layer
 n_filter_1 = 80
 kernel_size_1 = [57,6]
@@ -207,10 +233,6 @@ print('Forward pass successful!')
 
 ### Cross-validation
 
-# Batch shit
-batch_size = 1000
-max_epochs = 300
-
 #Folds creation : lists with all the np.array's inside
 data_folds=[]
 labels_folds=[]
@@ -220,26 +242,25 @@ for i in range(1,11):
     data_mat=np.expand_dims(data_mat['ob_spcgm'],axis=-1)
     data_folds.append(data_mat)
     labels_mat=scipy.io.loadmat('fold{}_labels.mat'.format(i))
-    labels_mat=utils.onehot(np.transpose(labels_mat['lb']), num_classes)
-    #One-hot encoding labels
+    labels_mat=utils.onehot(np.transpose(labels_mat['lb']), num_classes) #One-hot encoding labels
     labels_folds.append(labels_mat)
 
 saver = tf.train.Saver() # defining saver function
-
-#Cross validation parameter
-n_fold=10
 #Initialization of values over folds
-train_loss_cv = np.zeros((n_fold,max_epochs))
-train_accuracy_cv = np.zeros((n_fold,max_epochs))
-valid_loss_cv = np.zeros((n_fold,max_epochs))
-valid_accuracy_cv = np.zeros((n_fold,max_epochs))
-
+#I commented this out because we will now save one mat file for every fold
+#train_loss_cv = np.zeros((n_fold,max_epochs))
+#train_accuracy_cv = np.zeros((n_fold,max_epochs))
+#valid_loss_cv = np.zeros((n_fold,max_epochs))
+#valid_accuracy_cv = np.zeros((n_fold,max_epochs))
 with tf.Session() as sess:
     #Cross-validation
     try:
         #Cross-validation loop
-        for k in range(n_fold):
-            print('Begin training loop',k)
+        for k in CV_TEST_FOLDS:
+            foldname = "_CVtestFold%d"%k
+            print("------------------------------------------------------------")
+            print('----training on all folds but {0}. Testing on {0}'.format(k+1))
+            print("------------------------------------------------------------")
             #We reinitialize the weights
             sess.run(tf.global_variables_initializer())
             epoch = 0
@@ -257,11 +278,19 @@ with tf.Session() as sess:
 
             train_data=merged_train_data
             train_labels=merged_train_labels
+            if RUN_FAST:
+                howMany = min(np.shape(train_data)[0], 70)
+                train_data_fast = train_data[:howMany]
+                train_labels_fast = train_labels[:howMany]
 
             train_loader = bl.batch_loader(train_data, train_labels, batch_size)
 
             valid_data=data_folds[k]
             valid_labels=labels_folds[k]
+            if RUN_FAST:
+                howMany = min(np.shape(valid_data)[0], 30)
+                valid_data = valid_data[:howMany]
+                valid_labels = valid_labels[:howMany]
 
             # Training loss and accuracy for each epoch : initialization
             train_loss, train_accuracy = [], []
@@ -271,8 +300,10 @@ with tf.Session() as sess:
             test_loss, test_accuracy = [], []
 
             ### TRAINING ###
+            TIME_epoch_start = time.time()
             while (epoch < max_epochs):
-                train_batch_data, train_batch_labels = train_loader.next_batch()
+                if RUN_FAST: train_batch_data, train_batch_labels = train_data_fast, train_labels_fast #shorting the batchloader, sorry Lorenzo
+                else: train_batch_data, train_batch_labels = train_loader.next_batch()
                 feed_dict_train = {x_pl: train_batch_data, y_pl: train_batch_labels}
                 # deciding which parts to fetch, train_op makes the classifier "train"
                 fetches_train = [train_op, cross_entropy, accuracy]
@@ -299,39 +330,47 @@ with tf.Session() as sess:
                     # Reinitialize the intermediate loss and accuracy within epochs
                     _train_loss, _train_accuracy = [], []
                     #Print a summary of the training and validation
-                    print("Epoch {} : Train Loss {:6.3f}, Train acc {:6.3f},  Valid loss {:6.3f},  Valid acc {:6.3f}".format(
-                        epoch, train_loss[-1], train_accuracy[-1], valid_loss[-1], valid_accuracy[-1]))
-
+                    print("Epoch {} : Train Loss {:6.3f}, Train acc {:6.3f},  Valid loss {:6.3f},  Valid acc {:6.3f}, took {:10.2f}".format(
+                        epoch, train_loss[-1], train_accuracy[-1], valid_loss[-1], valid_accuracy[-1], time.time() - TIME_epoch_start))
+                    print("")
+                    TIME_epoch_start = time.time()
                     #Update the cross validation results
-                    train_loss_cv[k,epoch]=train_loss[-1]
-                    train_accuracy_cv[k,epoch]=train_accuracy[-1]
-                    valid_loss_cv[k,epoch]=valid_loss[-1]
-                    valid_accuracy_cv[k,epoch]=valid_accuracy[-1]
+                    #I commented this out because we will now save one mat file for every fold
+#                    train_loss_cv[k,epoch]=train_loss[-1]
+#                    train_accuracy_cv[k,epoch]=train_accuracy[-1]
+#                    valid_loss_cv[k,epoch]=valid_loss[-1]
+#                    valid_accuracy_cv[k,epoch]=valid_accuracy[-1]
 
                     #"Early stopping" (in fact, we keep going but just take the best network at every time step we have improvement)
                     if valid_accuracy[-1]==max(valid_accuracy):
-                        save_path = saver.save(sess, "./saved_models/piczak_300.ckpt",global_step=300)  # For space issues, we indicate global step being 300 but in fact it is the best_epoch step
+                        TIME_saving_start = time.time()
+                        print("saving ...")
+                        save_path = saver.save(sess, directory + "TF_ckpt" + foldname + "/piczak_300.ckpt",global_step=300)  # For space issues, we indicate global step being 300 but in fact it is the best_epoch step
+                        print("model TF ckpt saved under the path: ", save_path)
                         best_epoch=epoch
                         best_valid_accuracy = valid_accuracy[-1]
-
+                        variables_names =[v.name for v in tf.trainable_variables()]   
+                        var_value=sess.run(variables_names)
+			#TF saving done, now saving the convenient stuff
+			#mdict={'train_loss_cv':train_loss_cv,'train_accuracy_cv':train_accuracy_cv,'valid_loss_cv':valid_loss_cv,'valid_accuracy_cv':valid_accuracy_cv}
+                        mdict={'train_loss':train_loss,'train_accuracy':train_accuracy,'valid_loss':valid_loss,'valid_accuracy':valid_accuracy,'best_epoch':best_epoch,'best_valid_accuracy':best_valid_accuracy}
+                        if not RUN_FAST: scipy.io.savemat(save_path_perf + foldname, mdict)
+                        print("performance saved under the path: ", save_path_perf)
+                        scipy.io.savemat(save_path_numpy_weights + foldname, dict(
+                                        conv2d_1_kernel = var_value[0],
+                                        conv2d_1_bias = var_value[1],
+                                        conv2d_2_kernel = var_value[2],
+                                        conv2d_2_bias = var_value[3],
+                                        dense_1_kernel = var_value[4],
+                                        dense_1_bias = var_value[5],
+                                        dense_2_kernel = var_value[6],
+                                        dense_2_bias = var_value[7],
+                                        output_kernel = var_value[8],
+                                        output_bias = var_value[9]
+                                        ) )
+                        print("weights (numpy arrays) saved under the path: ", save_path_numpy_weights)
+                        print("... saving took {:10.2f}".format(time.time() - TIME_saving_start))
                     # Update epoch
                     epoch += 1;
-
-                    # whatever = 1000
     except KeyboardInterrupt:
         pass
-
-
-print("model saved under the path: ", save_path)
-
-#Saving stuff
-#mdict={'train_loss_cv':train_loss_cv,'train_accuracy_cv':train_accuracy_cv,'valid_loss_cv':valid_loss_cv,'valid_accuracy_cv':valid_accuracy_cv}
-mdict={'train_loss':train_loss,'train_accuracy':train_accuracy,'valid_loss':valid_loss,'valid_accuracy':valid_accuracy,'best_epoch':best_epoch,'best_valid_accuracy':best_valid_accuracy}
-
-scipy.io.savemat('piczak_cv.mat',mdict)
-
-        #TODO: fix this
-#plt.figure()
-#plt.plot(epoch, train_accuracy,'r', epoch, valid_accuracy,'b')
-#plt.legend(['Train Acc','Val Acc'], loc=4)
-#plt.xlabel('Epochs'), plt.ylabel('Acc'), plt.ylim([0.75,1.03])
