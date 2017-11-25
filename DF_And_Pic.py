@@ -1,7 +1,7 @@
 #####################
 ###   CODE SETUP  ###
 #####################
-
+    
 from __future__ import absolute_import, division, print_function 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,13 +9,42 @@ import os
 import sys
 sys.path.append(os.path.join('.', '..')) 
 import utils 
+import scipy.io
 import tensorflow as tf
 from tensorflow.contrib.layers import fully_connected, convolution2d, flatten, batch_norm, max_pool2d, dropout
 from tensorflow.python.ops.nn import relu, elu, relu6, sigmoid, tanh, softmax
 from tensorflow.python.ops.nn import dynamic_rnn
+from tensorflow.python.layers.pooling import MaxPooling1D
 
 ###SET RANDOM SEED AND RESET GRAPH
+
 tf.reset_default_graph()
+
+
+### SETTING TRAINABILITY FLAGS
+DF_trainable = True
+PZ_1stCNN_trainable = True #Lars wnat this set to True
+PZ_2ndCNN_trainable = False
+PZ_FullyC_trainable = False
+
+# =============================================================================
+tw_PZ = scipy.io.loadmat("./saved_models/TRAINEDWEIGHTS_from_chkpt" )
+# =============================================================================
+
+################################
+###   GET  TRAINED WEIGHTS   ###
+################################
+pretrained_conv2d_1_kernel_PZ = tw_PZ['conv2d_1_kernel']
+pretrained_conv2d_1_bias_PZ   = tw_PZ['conv2d_1_bias']
+pretrained_conv2d_2_kernel_PZ = tw_PZ['conv2d_2_kernel']
+pretrained_conv2d_2_bias_PZ =   tw_PZ['conv2d_2_bias']
+pretrained_dense_1_kernel_PZ =  tw_PZ['dense_1_kernel']
+pretrained_dense_1_bias_PZ =    tw_PZ['dense_1_bias']
+pretrained_dense_2_kernel_PZ =  tw_PZ['dense_2_kernel']
+pretrained_dense_2_bias_PZ =    tw_PZ['dense_2_bias']
+pretrained_output_kernel_PZ =   tw_PZ['output_kernel']
+pretrained_output_bias_PZ =     tw_PZ['output_bias']
+
 
 ##############################
 ###   NETWORK PARAMETERS   ###
@@ -23,8 +52,8 @@ tf.reset_default_graph()
 
 ###GENERAL VARIABLES
 # Input data size
-length = 20992; #k0 
-nchannels = 1; #??? Maybe two because stereo audiofiles?
+length = 20992  #k0 
+nchannels = 1  #??? Maybe two because stereo audiofiles?
 
 ###DEEP_FOURIER LAYERS HYPERPARAMETERS
 # Conv1, MaxPool1 parameters
@@ -120,7 +149,8 @@ print('----------------------------')
 ### DEEP FOURIER NETWORK
 with tf.variable_scope('DF_convLayer1'):
     ### INPUT DATA
-    print('x_pl_1 \t\t', x_pl_1.get_shape());
+    print("--- Deep Fourier conv layer 1")
+    print('x_pl_1 \t\t', x_pl_1.get_shape()) 
     
     ### CONV1 LAYER
     # Layer build
@@ -148,18 +178,19 @@ with tf.variable_scope('DF_convLayer1'):
     print('DF_conv1 \t\t', z1.get_shape())                     
                             
     ### MAX_POOL1
-    pool1 = tf.layers.MaxPooling1D(    pool_size=DF_pool_size_1,
+    pool1 = MaxPooling1D(    pool_size=DF_pool_size_1,
                                     strides=DF_strides_pool1,
                                     padding=DF_padding_pool1, 
                                     name='DF_pool_1'
                                 )
                                    
     # Activation pass, pooling
-    a1 = (pool1(z1));
+    a1 = (pool1(z1)) 
     print('DF_pool1 \t\t', a1.get_shape())
     
 with tf.variable_scope('DF_convLayer2'):    
     ### CONV2 LAYER
+    print("--- Deep Fourier conv layer 2")
     # Layer build
     z2 = tf.layers.conv1d(   inputs=a1,
                              filters=DF_filters_2,
@@ -185,16 +216,16 @@ with tf.variable_scope('DF_convLayer2'):
     print('DF_conv2 \t\t', z2.get_shape())                     
                             
     ### MAX_POOL2
-    pool2 = tf.layers.MaxPooling1D(    pool_size=DF_pool_size_2,
+    pool2 = MaxPooling1D(    pool_size=DF_pool_size_2,
                                     strides=DF_strides_pool2,
                                     padding=DF_padding_pool2, 
                                     name='DF_pool_2'
                                 )
                                    
     # Activation pass, pooling
-    a2 = (pool2(z2));
+    a2 = (pool2(z2)) 
     # Reshaping to swtich dimension and get them right (to 41x60 to 60x41x1)
-    a2 = tf.transpose(a2, perm=[0,2,1]);
+    a2 = tf.transpose(a2, perm=[0,2,1]) 
     a2 = tf.expand_dims(a2, axis=3)
     #a2 = tf.reshape(a2, )
     print('DF_pool2 \t\t', a2.get_shape())
@@ -202,7 +233,10 @@ with tf.variable_scope('DF_convLayer2'):
 ### PICZAK NETWORK
 # Convolutional layers
 with tf.variable_scope('PZ_convLayer1'):
+    print("--- Piczak")
     conv1 = tf.layers.conv2d(
+        kernel_initializer=tf.constant_initializer(pretrained_conv2d_1_kernel_PZ),
+        bias_initializer=tf.constant_initializer(pretrained_conv2d_1_bias_PZ),
         inputs=a2, ### NB!!! This is the output of the Deep_Fourier Network
         filters=n_filter_1,
         kernel_size=kernel_size_1,
@@ -210,7 +244,7 @@ with tf.variable_scope('PZ_convLayer1'):
         padding=padding_1,
         activation=tf.nn.relu,
         kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_1))
-    x=conv1;
+    x=conv1 
     print('PZ_conv1 \t\t', x.get_shape())
     pool1 = max_pool2d(x, kernel_size=pool_size_1,stride=pool_strides_1, padding=padding_1)
     x = pool1
@@ -219,6 +253,8 @@ with tf.variable_scope('PZ_convLayer1'):
 
 with tf.variable_scope('PZ_convLayer2'):
     conv2 = tf.layers.conv2d(
+        kernel_initializer=tf.constant_initializer(pretrained_conv2d_2_kernel_PZ),
+        bias_initializer=tf.constant_initializer(pretrained_conv2d_2_bias_PZ),
         inputs=x,
         filters=n_filter_2,
         kernel_size=kernel_size_2,
@@ -239,11 +275,11 @@ with tf.variable_scope('PZ_convLayer2'):
 # Dense layers
 with tf.variable_scope('PZ_denseLayer3'):
     dense3 = tf.layers.dense(
+        kernel_initializer=tf.constant_initializer(pretrained_dense_1_kernel_PZ),
+        bias_initializer=tf.constant_initializer(pretrained_dense_1_bias_PZ),
         inputs=x,
         units=num_units_3,
         activation=tf.nn.relu,
-        #kernel_initializer=None,
-        #bias_initializer=tf.zeros_initializer(),
         kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_3),
     )
     x = dense3
@@ -252,6 +288,8 @@ with tf.variable_scope('PZ_denseLayer3'):
 
 with tf.variable_scope('PZ_denseLayer4'):
     dense4 = tf.layers.dense(
+        kernel_initializer=tf.constant_initializer(pretrained_dense_2_kernel_PZ),
+        bias_initializer=tf.constant_initializer(pretrained_dense_2_bias_PZ),
         inputs=x,
         units=num_units_4,
         activation=tf.nn.relu,
@@ -265,6 +303,8 @@ with tf.variable_scope('PZ_denseLayer4'):
 
 with tf.variable_scope('PZ_output_layer'):
     dense_out = tf.layers.dense(
+        kernel_initializer=tf.constant_initializer(pretrained_output_kernel_PZ),
+        bias_initializer=tf.constant_initializer(pretrained_output_bias_PZ),
         inputs=x,
         units=num_classes,
         activation=None,
@@ -275,40 +315,38 @@ with tf.variable_scope('PZ_output_layer'):
     y = tf.nn.softmax(dense_out)
     print('denseOut\t', y.get_shape())
     
-print('Model consits of ', utils.num_params(), 'trainable parameters.')
+print('Model consists of ', utils.num_params(), 'trainable parameters.')
 
 #########################################
 ###   SETTING VARIABLES TRAINABILITY  ###
 #########################################
     
 ### STORING TRAINABLE VARIABLES
-all_vars = list()
-for variabs in tf.trainable_variables():
-    all_vars.append(variabs) # Store all trainable variables in a list
+all_vars = tf.trainable_variables()
     
 ### SLICING VARIABLES 
 # Deep Fourier training variables
-DF_trainables = all_vars[0:4];
+DF_trainable_stuff = all_vars[0:4]
 
-# Piczak (CNN) training variables
-PZ_CNN_trainables = all_vars[4:8];
+# Piczak (1st CNN) training variables
+PZ_1stCNN_trainable_stuff = all_vars[4:6]
+
+# Piczak (2nd CNN) training variables
+PZ_2ndCNN_trainable_stuff = all_vars[6:8]
 
 # Piczak (Fully Connected) training variables
-PZ_FullyC_trainables = all_vars[8:];
-
-### SETTING TRAINABILITY FLAGS
-DF_trainable = True;
-PZ_CNN_firstlayer_trainable = True; #in case we want to make only the first convlayer of Piczak trainable
-PZ_CNN_trainable = False;
-PZ_FullyC_trainable = False;
+PZ_FullyC_trainable_stuff = all_vars[8:]
 
 ### CREATING LIST OF VARIABLES TO TRAIN
-# NB!!! Please do not put PZ_CNN_firstlayer_trainable and PZ_CNN_trainable both to True (it will break)
-to_train = list();
-if(DF_trainable):
-    to_train.append(DF_trainables);
-if(PZ_CNN_trainable):
-    to_train.append(PZ_CNN_trainables)
+to_train = list() 
+if(DF_trainable): to_train += DF_trainable_stuff
+if(PZ_1stCNN_trainable): to_train += PZ_1stCNN_trainable_stuff
+if(PZ_2ndCNN_trainable): to_train += PZ_2ndCNN_trainable_stuff
+if(PZ_FullyC_trainable): to_train += PZ_FullyC_trainable_stuff
+
+print("and we will train: ")
+for j in range(len(to_train)):
+    print("## ", to_train[j])
 
 ####################################################
 ###   LOSS, TRAINING AND PERFORMANCE DEFINITION  ###
@@ -324,7 +362,7 @@ with tf.variable_scope('training'):
     # defining our optimizer
     sgd = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=momentum, use_nesterov=True)
     # applying the gradients
-    train_op = sgd.minimize(cross_entropy,  var_list=what_we_want_to_train)
+    train_op = sgd.minimize(cross_entropy,  var_list= to_train)
 
 with tf.variable_scope('performance'):
     # making a one-hot encoded vector of correct (1) and incorrect (0) predictions
@@ -337,19 +375,25 @@ with tf.variable_scope('performance'):
 ##############################
 
 #Random audio images for testing
-#x_test_forward = np.random.normal(0, 1, [50,20992,1]).astype('float32') #dummy data
-#
-## restricting memory usage, TensorFlow is greedy and will use all memory otherwise
-#gpu_opts = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
-#
-#sess=tf.Session(config=tf.ConfigProto(gpu_options=gpu_opts))
-#sess.run(tf.global_variables_initializer())
-#feed_dict = {x_pl_1: x_test_forward}
-#res_forward_pass = sess.run(fetches=[y], feed_dict=feed_dict)
-#
-#print("y", res_forward_pass[0].shape)
-#print('Forward pass successful!')
+x_test_forward = np.random.normal(0, 1, [50,20992,1]).astype('float32') #dummy data
+y_dummy_train =  utils.onehot(np.random.randint(0, 10, 50), 10)
+
+# restricting memory usage, TensorFlow is greedy and will use all memory otherwise
+gpu_opts = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
+
+sess=tf.Session(config=tf.ConfigProto(gpu_options=gpu_opts))
+sess.run(tf.global_variables_initializer())
+eat_this = {x_pl_1: x_test_forward, y_pl: y_dummy_train}
+res_forward_pass = sess.run(fetches=[y], feed_dict=eat_this)
+
+print("y", res_forward_pass[0].shape)
+print('Forward pass successful!')
 
 ##########################
 ###   TRAINING LOOP    ###
 ##########################
+
+sess.run(fetches=[train_op], feed_dict=eat_this)
+print("training step successful!")
+
+sess.close()

@@ -184,7 +184,9 @@ with tf.variable_scope('loss'):
 what_we_want_to_train = list()
 for stuff in tf.trainable_variables()[0:2]: #we want to update only the first Piczak Layer (Kernel and Bias, ergo 2 elements in the list) 
     what_we_want_to_train.append(stuff)
-print("what_we_want_to_train: ", what_we_want_to_train)                                              
+print("what_we_want_to_train: ")   
+for j in range(len(what_we_want_to_train)):
+    print("## ", what_we_want_to_train[j])                                           
 
 with tf.variable_scope('training'):
     # defining our optimizer
