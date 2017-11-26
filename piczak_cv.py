@@ -7,6 +7,7 @@ import numpy as np
 import tensorflow as tf
 import os
 sys.path.append(os.path.join('.', '..'))
+import random
 import utils
 import batch_loader as bl
 import scipy
@@ -22,17 +23,17 @@ if len(sys.argv) == 2:       #if you run the script in the CMD/shell like
                              # python3 piczak_cv.py FAST
     if sys.argv[1] == "FAST": 
         RUN_FAST = True
-        CV_TEST_FOLDS = [1, 6]
+        CV_VALID_FOLDS = [1, 6]
         print("running in fast mode (not much data).")
     else: 
         RUN_FAST = False
-        try: CV_TEST_FOLDS = [int(sys.argv[1])] # python3 piczak_cv.py 3 --> test only on fold 3
-        except ValueError: CV_TEST_FOLDS = range(n_fold)       
+        try: CV_VALID_FOLDS = [int(sys.argv[1])] # python3 piczak_cv.py 3 --> test only on fold 3
+        except ValueError: CV_VALID_FOLDS = range(n_fold)
 else: #if you run the script "normally" from Pycharm, Spyder or shell 
     RUN_FAST = False
     # True: run only with a few data and not all CV folds, just to check
     # False [default]: run everything (same behaviour as before)  
-    CV_TEST_FOLDS = range(n_fold)    
+    CV_VALID_FOLDS = range(n_fold)
 #Cross validation parameter
 if RUN_FAST: 
     max_epochs = 2
@@ -43,8 +44,14 @@ directory = "./trained_models/piczak_{0}/".format(max_epochs)
 save_path_perf = directory + "performance"
 save_path_numpy_weights = directory + "trainedweights"
 if RUN_FAST: save_path_numpy_weights += "_FAST"
+
+#Manuel way to decide whether we run fast code/clean Piczak
+
+CLEAN = True
+RUN_FAST = True
+
 ########################################
-print("CV: will test on folds ", CV_TEST_FOLDS)
+print("CV: will test on folds ", CV_VALID_FOLDS)
 
 #bands : related to frequencies. Frames : related to audio sequence. 2 channels (the spec and the delta's)
 bands, frames, n_channels = 60, 41, 1
@@ -256,10 +263,10 @@ with tf.Session() as sess:
     #Cross-validation
     try:
         #Cross-validation loop
-        for k in CV_TEST_FOLDS:
-            foldname = "_CVtestFold%d"%k
+        for k in CV_VALID_FOLDS:
+            foldname = "_CVValidFold%d"%k
             print("------------------------------------------------------------")
-            print('----training on all folds but {0}. Testing on {0}'.format(k+1))
+            print('----training on all folds but {0}. Validing on {0}'.format(k+1))
             print("------------------------------------------------------------")
             #We reinitialize the weights
             sess.run(tf.global_variables_initializer())
@@ -282,8 +289,10 @@ with tf.Session() as sess:
                 howMany = min(np.shape(train_data)[0], 70)
                 train_data_fast = train_data[:howMany]
                 train_labels_fast = train_labels[:howMany]
+            if CLEAN: is_balanced = True
+            else: is_balanced = False
 
-            train_loader = bl.batch_loader(train_data, train_labels, batch_size)
+            train_loader = bl.batch_loader(train_data, train_labels, batch_size, is_balanced)
 
             valid_data=data_folds[k]
             valid_labels=labels_folds[k]
@@ -303,7 +312,9 @@ with tf.Session() as sess:
             TIME_epoch_start = time.time()
             while (epoch < max_epochs):
                 if RUN_FAST: train_batch_data, train_batch_labels = train_data_fast, train_labels_fast #shorting the batchloader, sorry Lorenzo
-                else: train_batch_data, train_batch_labels = train_loader.next_batch()
+                else:
+                    train_batch_data, train_batch_labels = train_loader.next_batch()
+
                 feed_dict_train = {x_pl: train_batch_data, y_pl: train_batch_labels}
                 # deciding which parts to fetch, train_op makes the classifier "train"
                 fetches_train = [train_op, cross_entropy, accuracy]
@@ -315,7 +326,7 @@ with tf.Session() as sess:
 
                 ### VALIDATING ###
                 #When we reach the last mini-batch of the epoch
-                if train_loader.is_epoch_done():
+                if train_loader.is_epoch_done() or RUN_FAST:
                     # what to feed our accuracy op
                     feed_dict_valid = {x_pl: valid_data, y_pl : valid_labels}
                     # deciding which parts to fetch
@@ -330,7 +341,7 @@ with tf.Session() as sess:
                     # Reinitialize the intermediate loss and accuracy within epochs
                     _train_loss, _train_accuracy = [], []
                     #Print a summary of the training and validation
-                    print("Epoch {} : Train Loss {:6.3f}, Train acc {:6.3f},  Valid loss {:6.3f},  Valid acc {:6.3f}, took {:10.2f}".format(
+                    print("Epoch {} : Train Loss {:6.3f}, Train acc {:6.3f},  Valid loss {:6.3f},  Valid acc {:6.3f}, took {:10.2f} s".format(
                         epoch, train_loss[-1], train_accuracy[-1], valid_loss[-1], valid_accuracy[-1], time.time() - TIME_epoch_start))
                     print("")
                     TIME_epoch_start = time.time()
@@ -351,10 +362,11 @@ with tf.Session() as sess:
                         best_valid_accuracy = valid_accuracy[-1]
                         variables_names =[v.name for v in tf.trainable_variables()]   
                         var_value=sess.run(variables_names)
-			#TF saving done, now saving the convenient stuff
-			#mdict={'train_loss_cv':train_loss_cv,'train_accuracy_cv':train_accuracy_cv,'valid_loss_cv':valid_loss_cv,'valid_accuracy_cv':valid_accuracy_cv}
+			            #TF saving done, now saving the convenient stuff
+			            #mdict={'train_loss_cv':train_loss_cv,'train_accuracy_cv':train_accuracy_cv,'valid_loss_cv':valid_loss_cv,'valid_accuracy_cv':valid_accuracy_cv}
                         mdict={'train_loss':train_loss,'train_accuracy':train_accuracy,'valid_loss':valid_loss,'valid_accuracy':valid_accuracy,'best_epoch':best_epoch,'best_valid_accuracy':best_valid_accuracy}
                         if not RUN_FAST: scipy.io.savemat(save_path_perf + foldname, mdict)
+
                         print("performance saved under the path: ", save_path_perf)
                         scipy.io.savemat(save_path_numpy_weights + foldname, dict(
                                         conv2d_1_kernel = var_value[0],
