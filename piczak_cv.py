@@ -18,31 +18,20 @@ from tensorflow.python.ops.nn import relu, elu, relu6, sigmoid, tanh, softmax
 from tensorflow.python.ops.nn import dynamic_rnn
 ########################################
 n_fold=10
-if len(sys.argv) == 2:       #if you run the script in the CMD/shell like 
-                             # python3 piczak_cv.py FAST
-    if sys.argv[1] == "FAST": 
-        RUN_FAST = True
-        CV_VALID_FOLDS = [1, 6]
-        print("running in fast mode (not much data).")
-    else: 
-        RUN_FAST = False
-        try: CV_VALID_FOLDS = [int(sys.argv[1])] # python3 piczak_cv.py 3 --> test only on fold 3
-        except ValueError: CV_VALID_FOLDS = range(n_fold)
-else: #if you run the script "normally" from Pycharm, Spyder or shell 
-    RUN_FAST = False
-    # True: run only with a few data and not all CV folds, just to check
-    # False [default]: run everything (same behaviour as before)  
-    CV_VALID_FOLDS = range(n_fold)
-#Cross validation parameter
-if RUN_FAST: 
+
+RUN_FAST=True
+
+if RUN_FAST:
+    CV_VALID_FOLDS=[8]
     max_epochs = 2
-else: 
+else:
+    CV_VALID_FOLDS = range(n_fold)
     max_epochs = 300
+
 batch_size = 1000
-directory = "./trained_models/piczak_{0}/".format(max_epochs)
+directory = "./"
 save_path_perf = directory + "performance"
 save_path_numpy_weights = directory + "trainedweights"
-if RUN_FAST: save_path_numpy_weights += "_FAST"
 
 #for the time being, hardcoded
 CLEAN = True
@@ -346,15 +335,16 @@ with tf.Session() as sess:
                         print(conf_mat)
                         TIME_saving_start = time.time()
                         print("saving ...")
-                        save_path = saver.save(sess, directory + "TF_ckpt" + foldname + "/piczak_300.ckpt",global_step=300)  # For space issues, we indicate global step being 300 but in fact it is the best_epoch step
+                        #save_path = saver.save(sess, directory + "TF_ckpt" + foldname + "/piczak_300.ckpt",global_step=300)  # For space issues, we indicate global step being 300 but in fact it is the best_epoch step
+                        save_path = saver.save(sess, directory + "/piczak_300.ckpt",global_step=300)  # For space issues, we indicate global step being 300 but in fact it is the best_epoch step
                         print("model TF ckpt saved under the path: ", save_path)
                         best_valid_accuracy = valid_accuracy[-1]
                         variables_names =[v.name for v in tf.trainable_variables()]   
                         var_value=sess.run(variables_names)
 			           #TF saving done, now saving the convenient stuff
 			           #mdict={'train_loss_cv':train_loss_cv,'train_accuracy_cv':train_accuracy_cv,'valid_loss_cv':valid_loss_cv,'valid_accuracy_cv':valid_accuracy_cv}
-                        mdict={'train_loss':train_loss,'train_accuracy':train_accuracy,'valid_loss':valid_loss,'valid_accuracy':valid_accuracy,'best_epoch':epoch,'best_valid_accuracy':best_valid_accuracy}
-                        if not RUN_FAST: scipy.io.savemat(save_path_perf + foldname, mdict)
+                        mdict={'train_loss':train_loss,'train_accuracy':train_accuracy,'valid_loss':valid_loss,'valid_accuracy':valid_accuracy,'best_epoch':epoch,'best_valid_accuracy':best_valid_accuracy,'conf_mat':conf_mat}
+                        scipy.io.savemat(save_path_perf + foldname, mdict)
 
                         print("performance saved under the path: ", save_path_perf)
                         scipy.io.savemat(save_path_numpy_weights + foldname, dict(
