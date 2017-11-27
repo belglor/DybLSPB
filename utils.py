@@ -94,6 +94,10 @@ def onehot(t, num_classes):
         out[row, col] = 1
     return out
 
+def onehot_inverse(labels_onehot):
+    #expected shape: (num_obs, num_classes)
+    return np.argmax(labels_onehot, axis=1)
+
 class ConfusionMatrix:
     """
        Simple confusion matrix class

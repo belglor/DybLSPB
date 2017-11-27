@@ -7,13 +7,12 @@ import numpy as np
 import tensorflow as tf
 import os
 sys.path.append(os.path.join('.', '..'))
-import random
 import utils
 import batch_loader as bl
 import scipy
 from scipy import io
 import time
-
+from sklearn.metrics import confusion_matrix
 from tensorflow.contrib.layers import fully_connected, convolution2d, flatten, batch_norm, max_pool2d, dropout
 from tensorflow.python.ops.nn import relu, elu, relu6, sigmoid, tanh, softmax
 from tensorflow.python.ops.nn import dynamic_rnn
@@ -45,13 +44,11 @@ save_path_perf = directory + "performance"
 save_path_numpy_weights = directory + "trainedweights"
 if RUN_FAST: save_path_numpy_weights += "_FAST"
 
-#Manuel way to decide whether we run fast code/clean Piczak
-
+#for the time being, hardcoded
 CLEAN = True
-RUN_FAST = True
 
 ########################################
-print("CV: will test on folds ", CV_VALID_FOLDS)
+print("CV: will validate on folds ", CV_VALID_FOLDS)
 
 #bands : related to frequencies. Frames : related to audio sequence. 2 channels (the spec and the delta's)
 bands, frames, n_channels = 60, 41, 1
@@ -266,7 +263,7 @@ with tf.Session() as sess:
         for k in CV_VALID_FOLDS:
             foldname = "_CVValidFold%d"%k
             print("------------------------------------------------------------")
-            print('----training on all folds but {0}. Validing on {0}'.format(k+1))
+            print('----training on all folds but no. {0}. Validating on no. {0}'.format(k+1))
             print("------------------------------------------------------------")
             #We reinitialize the weights
             sess.run(tf.global_variables_initializer())
@@ -285,21 +282,11 @@ with tf.Session() as sess:
 
             train_data=merged_train_data
             train_labels=merged_train_labels
-            if RUN_FAST:
-                howMany = min(np.shape(train_data)[0], 70)
-                train_data_fast = train_data[:howMany]
-                train_labels_fast = train_labels[:howMany]
-            if CLEAN: is_balanced = True
-            else: is_balanced = False
 
-            train_loader = bl.batch_loader(train_data, train_labels, batch_size, is_balanced)
+            train_loader = bl.batch_loader(train_data, train_labels, batch_size, is_balanced = CLEAN, is_fast = RUN_FAST)
 
             valid_data=data_folds[k]
             valid_labels=labels_folds[k]
-            if RUN_FAST:
-                howMany = min(np.shape(valid_data)[0], 30)
-                valid_data = valid_data[:howMany]
-                valid_labels = valid_labels[:howMany]
 
             # Training loss and accuracy for each epoch : initialization
             train_loss, train_accuracy = [], []
@@ -311,9 +298,7 @@ with tf.Session() as sess:
             ### TRAINING ###
             TIME_epoch_start = time.time()
             while (epoch < max_epochs):
-                if RUN_FAST: train_batch_data, train_batch_labels = train_data_fast, train_labels_fast #shorting the batchloader, sorry Lorenzo
-                else:
-                    train_batch_data, train_batch_labels = train_loader.next_batch()
+                train_batch_data, train_batch_labels = train_loader.next_batch()
 
                 feed_dict_train = {x_pl: train_batch_data, y_pl: train_batch_labels}
                 # deciding which parts to fetch, train_op makes the classifier "train"
@@ -326,7 +311,7 @@ with tf.Session() as sess:
 
                 ### VALIDATING ###
                 #When we reach the last mini-batch of the epoch
-                if train_loader.is_epoch_done() or RUN_FAST:
+                if train_loader.is_epoch_done():
                     # what to feed our accuracy op
                     feed_dict_valid = {x_pl: valid_data, y_pl : valid_labels}
                     # deciding which parts to fetch
@@ -341,7 +326,7 @@ with tf.Session() as sess:
                     # Reinitialize the intermediate loss and accuracy within epochs
                     _train_loss, _train_accuracy = [], []
                     #Print a summary of the training and validation
-                    print("Epoch {} : Train Loss {:6.3f}, Train acc {:6.3f},  Valid loss {:6.3f},  Valid acc {:6.3f}, took {:10.2f} s".format(
+                    print("Epoch {} : Train Loss {:6.3f}, Train acc {:6.3f},  Valid loss {:6.3f},  Valid acc {:6.3f}, took {:10.2f} sec".format(
                         epoch, train_loss[-1], train_accuracy[-1], valid_loss[-1], valid_accuracy[-1], time.time() - TIME_epoch_start))
                     print("")
                     TIME_epoch_start = time.time()
@@ -354,17 +339,21 @@ with tf.Session() as sess:
 
                     #"Early stopping" (in fact, we keep going but just take the best network at every time step we have improvement)
                     if valid_accuracy[-1]==max(valid_accuracy):
+                        pred_labels = np.argmax(sess.run(fetches=y, feed_dict={x_pl: valid_data}), axis=1)
+                        true_labels = utils.onehot_inverse(valid_labels)
+                        conf_mat = confusion_matrix(true_labels, pred_labels, labels=range(10))
+                        print("confusion matrix for entire validation data:")
+                        print(conf_mat)
                         TIME_saving_start = time.time()
                         print("saving ...")
                         save_path = saver.save(sess, directory + "TF_ckpt" + foldname + "/piczak_300.ckpt",global_step=300)  # For space issues, we indicate global step being 300 but in fact it is the best_epoch step
                         print("model TF ckpt saved under the path: ", save_path)
-                        best_epoch=epoch
                         best_valid_accuracy = valid_accuracy[-1]
                         variables_names =[v.name for v in tf.trainable_variables()]   
                         var_value=sess.run(variables_names)
-			            #TF saving done, now saving the convenient stuff
-			            #mdict={'train_loss_cv':train_loss_cv,'train_accuracy_cv':train_accuracy_cv,'valid_loss_cv':valid_loss_cv,'valid_accuracy_cv':valid_accuracy_cv}
-                        mdict={'train_loss':train_loss,'train_accuracy':train_accuracy,'valid_loss':valid_loss,'valid_accuracy':valid_accuracy,'best_epoch':best_epoch,'best_valid_accuracy':best_valid_accuracy}
+			           #TF saving done, now saving the convenient stuff
+			           #mdict={'train_loss_cv':train_loss_cv,'train_accuracy_cv':train_accuracy_cv,'valid_loss_cv':valid_loss_cv,'valid_accuracy_cv':valid_accuracy_cv}
+                        mdict={'train_loss':train_loss,'train_accuracy':train_accuracy,'valid_loss':valid_loss,'valid_accuracy':valid_accuracy,'best_epoch':epoch,'best_valid_accuracy':best_valid_accuracy}
                         if not RUN_FAST: scipy.io.savemat(save_path_perf + foldname, mdict)
 
                         print("performance saved under the path: ", save_path_perf)
@@ -386,3 +375,4 @@ with tf.Session() as sess:
                     epoch += 1;
     except KeyboardInterrupt:
         pass
+print("<><><><><><><><> the entire program finished without errors!! <><><><><><><><>")
