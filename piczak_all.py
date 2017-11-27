@@ -376,7 +376,7 @@ with tf.Session() as sess:
                         TIME_epoch_start = time.time()
 
                         #"Early stopping" (in fact, we keep going but just take the best network at every time step we have improvement of the validation loss)
-                        if valid_loss[-1]==max(valid_loss):
+                        if valid_loss[-1]==min(valid_loss):
                             pred_labels = np.argmax(sess.run(fetches=y, feed_dict={x_pl: valid_data}), axis=1)
                             true_labels = utils.onehot_inverse(valid_labels)
                             conf_mat[k] = confusion_matrix(true_labels, pred_labels, labels=range(10))
@@ -469,7 +469,7 @@ with tf.Session() as sess:
                     print("")
                     TIME_epoch_start = time.time()
                     # "Early stopping" (in fact, we keep going but just take the best network at every time step we have improvement)
-                    if valid_loss[-1] == max(valid_loss):
+                    if valid_loss[-1] == min(valid_loss):
                         #Updating the best quantities
                         best_train_loss = train_loss[-1]
                         best_train_accuracy = train_accuracy[-1]
