@@ -23,7 +23,7 @@ from tensorflow.python.ops.nn import relu, elu, relu6, sigmoid, tanh, softmax
 
 #If we want to run cross-validation (set true) or just the "A" method (set false)
 n_fold=10
-RUN_CV = False
+RUN_CV = True
 #Folds we validate and test on (only relevant if RUN_CV==False). Indices of the folds are in the "Matlab" naming mode
 k_valid=9
 k_test=10
@@ -31,14 +31,14 @@ k_test=10
 #If we just want to test quickly on a few epochs (advised : put RUN_CV==False in this case)
 RUN_FAST = True
 #If we want oversampled (balanced) mini-batches or not
-BALANCED_BATCHES = True
+BALANCED_BATCHES = False
 
 #Learning rate
 learning_rate=0.002
 
 #Number of epochs (only one is relevant acc. to which RUN_FAST value has been given)
 max_epochs_fast = 2
-max_epochs_regular = 300
+max_epochs_regular = 3
 
 #Batch size
 batch_size = 1000
@@ -376,7 +376,7 @@ with tf.Session() as sess:
                         TIME_epoch_start = time.time()
 
                         #"Early stopping" (in fact, we keep going but just take the best network at every time step we have improvement of the validation loss)
-                        if valid_loss[-1]==min(valid_loss):
+                        if valid_accuracy[-1]==max(valid_accuracy):
                             pred_labels = np.argmax(sess.run(fetches=y, feed_dict={x_pl: valid_data}), axis=1)
                             true_labels = utils.onehot_inverse(valid_labels)
                             conf_mat[k] = confusion_matrix(true_labels, pred_labels, labels=range(10))
@@ -384,6 +384,7 @@ with tf.Session() as sess:
                             best_train_accuracy[k] = train_accuracy[-1]
                             best_valid_loss[k] = valid_loss[-1]
                             best_valid_accuracy[k] = valid_accuracy[-1]
+                            best_epoch[k]=epoch
                         # Update epoch
                         epoch += 1;
             # Save everything
@@ -469,7 +470,7 @@ with tf.Session() as sess:
                     print("")
                     TIME_epoch_start = time.time()
                     # "Early stopping" (in fact, we keep going but just take the best network at every time step we have improvement)
-                    if valid_loss[-1] == min(valid_loss):
+                    if valid_accuracy[-1] == max(valid_accuracy):
                         #Updating the best quantities
                         best_train_loss = train_loss[-1]
                         best_train_accuracy = train_accuracy[-1]
