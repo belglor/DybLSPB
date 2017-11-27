@@ -27,15 +27,18 @@ if RUN_FAST:
 else:
     CV_VALID_FOLDS = range(n_fold)
     max_epochs = 300
-
 batch_size = 1000
-directory = "./"
-save_path_perf = directory + "performance"
-save_path_numpy_weights = directory + "trainedweights"
 
-#for the time being, hardcoded
-CLEAN = True
+#create these 3 folders if you don't have them
+#if you really have to change these folders, do it HERE and not further down in the code, and do not git push these folders
+data_folder = "./data/"
+result_tf_folder = "./results_tf/"
+result_mat_folder = "./results_mat/"
 
+save_path_perf = result_mat_folder + "performance"
+save_path_numpy_weights = result_mat_folder + "trainedweights"
+
+BALANCED_BATCHES = True
 ########################################
 print("CV: will validate on folds ", CV_VALID_FOLDS)
 
@@ -230,11 +233,11 @@ print('Forward pass successful!')
 data_folds=[]
 labels_folds=[]
 for i in range(1,11):
-    data_mat=scipy.io.loadmat('fold{}_spcgm.mat'.format(i))
+    data_mat=scipy.io.loadmat(data_folder + 'fold{}_spcgm.mat'.format(i))
     #Add one dimension for being eligible for the network
     data_mat=np.expand_dims(data_mat['ob_spcgm'],axis=-1)
     data_folds.append(data_mat)
-    labels_mat=scipy.io.loadmat('fold{}_labels.mat'.format(i))
+    labels_mat=scipy.io.loadmat(data_folder + 'fold{}_labels.mat'.format(i))
     labels_mat=utils.onehot(np.transpose(labels_mat['lb']), num_classes) #One-hot encoding labels
     labels_folds.append(labels_mat)
 
@@ -272,7 +275,7 @@ with tf.Session() as sess:
             train_data=merged_train_data
             train_labels=merged_train_labels
 
-            train_loader = bl.batch_loader(train_data, train_labels, batch_size, is_balanced = CLEAN, is_fast = RUN_FAST)
+            train_loader = bl.batch_loader(train_data, train_labels, batch_size, is_balanced = BALANCED_BATCHES, is_fast = RUN_FAST)
 
             valid_data=data_folds[k]
             valid_labels=labels_folds[k]
@@ -336,7 +339,7 @@ with tf.Session() as sess:
                         TIME_saving_start = time.time()
                         print("saving ...")
                         #save_path = saver.save(sess, directory + "TF_ckpt" + foldname + "/piczak_300.ckpt",global_step=300)  # For space issues, we indicate global step being 300 but in fact it is the best_epoch step
-                        save_path = saver.save(sess, directory + "/piczak_300.ckpt",global_step=300)  # For space issues, we indicate global step being 300 but in fact it is the best_epoch step
+                        save_path = saver.save(sess, result_tf_folder+"piczak_300.ckpt",global_step=300)  # For space issues, we indicate global step being 300 but in fact it is the best_epoch step
                         print("model TF ckpt saved under the path: ", save_path)
                         best_valid_accuracy = valid_accuracy[-1]
                         variables_names =[v.name for v in tf.trainable_variables()]   
@@ -346,7 +349,7 @@ with tf.Session() as sess:
                         mdict={'train_loss':train_loss,'train_accuracy':train_accuracy,'valid_loss':valid_loss,'valid_accuracy':valid_accuracy,'best_epoch':epoch,'best_valid_accuracy':best_valid_accuracy,'conf_mat':conf_mat}
                         scipy.io.savemat(save_path_perf + foldname, mdict)
 
-                        print("performance saved under the path: ", save_path_perf)
+                        print("performance saved under %s...." %save_path_perf)
                         scipy.io.savemat(save_path_numpy_weights + foldname, dict(
                                         conv2d_1_kernel = var_value[0],
                                         conv2d_1_bias = var_value[1],
@@ -359,7 +362,7 @@ with tf.Session() as sess:
                                         output_kernel = var_value[8],
                                         output_bias = var_value[9]
                                         ) )
-                        print("weights (numpy arrays) saved under the path: ", save_path_numpy_weights)
+                        print("weights (numpy arrays) saved under %s....: " %save_path_numpy_weights)
                         print("... saving took {:10.2f}".format(time.time() - TIME_saving_start))
                     # Update epoch
                     epoch += 1;
