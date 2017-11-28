@@ -50,15 +50,23 @@ batch_size = 1000
 if RUN_FAST:
     CV_VALID_FOLDS=[8]
     max_epochs = max_epochs_fast
+    print('----------------------DESCRIPTION-----------------------------')
+    print('Fast mode')
+    print('{0} epochs to be run'.format(max_epochs))
 else:
     CV_VALID_FOLDS = range(n_fold)
     max_epochs = max_epochs_regular
+    print('------')
+    print('Regular mode')
+    print('{0} epochs to be run'.format(max_epochs))
 
 #Naming of output files
 if RUN_CV:
-    print("Will perform cross-validation")
+    print("Cross-validation")
 else:
-    print('Will perform the "A" method with validation on fold'+str(k_valid)+'and test on fold'+str(k_test))
+    print('"A" method with validation on fold'+str(k_valid)+'and test on fold'+str(k_test))
+
+print('Learning rate : {0}'.format(learning_rate))
 
 #We just shift -1 the folds indices to match with Python way to think
 k_valid=k_valid-1
@@ -321,8 +329,8 @@ with tf.Session() as sess:
                 merged_train_data=np.empty((0,bands,frames,n_channels))
                 merged_train_labels=np.empty((0,num_classes))
                 for i_merge in range(n_fold-1):
-                    merged_train_data=np.append(merged_train_data,data_folds[i_merge],axis=0)
-                    merged_train_labels=np.append(merged_train_labels,labels_folds[i_merge],axis=0)
+                    merged_train_data=np.append(merged_train_data,train_data[i_merge],axis=0)
+                    merged_train_labels=np.append(merged_train_labels,train_labels[i_merge],axis=0)
 
                 train_data=merged_train_data
                 train_labels=merged_train_labels
@@ -411,9 +419,9 @@ with tf.Session() as sess:
             # Merging data (list being different from np.arrays)
             merged_train_data = np.empty((0, bands, frames, n_channels))
             merged_train_labels = np.empty((0, num_classes))
-            for i_merge in range(n_fold - 1):
-                merged_train_data = np.append(merged_train_data, data_folds[i_merge], axis=0)
-                merged_train_labels = np.append(merged_train_labels, labels_folds[i_merge], axis=0)
+            for i_merge in range(n_fold - 2):
+                merged_train_data = np.append(merged_train_data, train_data[i_merge], axis=0)
+                merged_train_labels = np.append(merged_train_labels, train_labels[i_merge], axis=0)
 
             train_data = merged_train_data
             train_labels = merged_train_labels
