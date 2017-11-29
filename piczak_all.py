@@ -431,9 +431,6 @@ with tf.Session() as sess:
             valid_data = data_folds[k_valid]
             valid_labels = labels_folds[k_valid]
 
-            test_data = data_folds[k_test]
-            test_labels = labels_folds[k_test]
-
             # Training loss and accuracy for each epoch : initialization
             train_loss, train_accuracy = [], []
             # Training loss and accuracy within an epoch (is erased at every new epoch)
