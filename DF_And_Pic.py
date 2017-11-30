@@ -23,7 +23,7 @@ from sklearn.metrics import confusion_matrix
 tf.reset_default_graph()
 
 # =============================================================================
-tw_PZ = scipy.io.loadmat("/home/lorenzo/Documents/UNI/MSc/02456 Deep Learning/Project/DybLSPB-master/trained_models/piczak_150/pic150_TRAINEDWEIGHTS_from_chkpt" ) #can be found on Google Drive
+tw_PZ = scipy.io.loadmat("results_mat/trainedweights/piczak_A_unbal_LR0-002_ME300_WEIGHTS" ) #can be found on Google Drive
 # =============================================================================
 
 #%%
@@ -48,7 +48,7 @@ BALANCED_BATCHES = False
 learning_rate=0.002
 #Number of epochs (only one is relevant acc. to which RUN_FAST value has been given)
 max_epochs_fast = 2
-max_epochs_regular = 3
+max_epochs_regular = 300
 #Batch size
 batch_size = 1000
 
@@ -96,6 +96,24 @@ for directory in [save_path_perf,save_path_numpy_weights]:
 #Filename definition
 word_cv='A'
 
+if DF_trainable:
+    word_df='T'
+else:
+    word_df='N'
+if PZ_1stCNN_trainable:
+    word_cnn1='T'
+else:
+    word_cnn1='N'
+if PZ_2ndCNN_trainable:
+    word_cnn2='T'
+else:
+    word_cnn2='N'
+if PZ_FullyC_trainable:
+    word_fc='T'
+else:
+    word_fc='N'
+
+
 if BALANCED_BATCHES:
     word_bal='bal'
 else:
@@ -104,7 +122,7 @@ else:
 word_lr = str(learning_rate)
 word_lr=word_lr[:1]+'-'+word_lr[2:]
 
-filename="piczak_{0}_{1}_LR{2}_ME{3}".format(word_cv,word_bal,word_lr,max_epochs)
+filename="deepFourier_df{0}_cnn1{1}_cnn2{2}_fc{3}_{4}_{5}_LR{6}_ME{7}".format(word_df,word_cnn1,word_cnn2,word_fc,word_cv,word_bal,word_lr,max_epochs)
 
 #%%
 ################################
@@ -456,8 +474,8 @@ with tf.variable_scope('performance'):
 x_test_forward = np.random.normal(0, 1, [50,20992,1]).astype('float32') #dummy data
 y_dummy_train =  utils.onehot(np.random.randint(0, 10, 50), 10)
 
-# restricting memory usage, TensorFlow is greedy and will use all memory otherwise
-gpu_opts = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
+# This hell line
+gpu_opts = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
 
 sess=tf.Session(config=tf.ConfigProto(gpu_options=gpu_opts))
 sess.run(tf.global_variables_initializer())
