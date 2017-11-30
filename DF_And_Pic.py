@@ -61,13 +61,11 @@ batch_size = 1000
 
 #Folds and number of epochs
 if RUN_FAST:
-    CV_VALID_FOLDS=[8]
     max_epochs = max_epochs_fast
     print('----------------------DESCRIPTION-----------------------------')
     print('Fast mode')
     print('{0} epochs to be run'.format(max_epochs))
 else:
-    CV_VALID_FOLDS = range(n_fold)
     max_epochs = max_epochs_regular
     print('------')
     print('Regular mode')
@@ -547,6 +545,7 @@ with tf.Session() as sess:
         # Training loss and accuracy within an epoch (is erased at every new epoch)
         _train_loss, _train_accuracy = [], []
         valid_loss, valid_accuracy = [], []
+	bal_valid_accuracy = []
         test_loss, test_accuracy = [], []
 
         ### TRAINING ###
@@ -576,6 +575,12 @@ with tf.Session() as sess:
                 valid_accuracy += [res[1]]
                 train_loss += [np.mean(_train_loss)]
                 train_accuracy += [np.mean(_train_accuracy)]
+		#Balanced validation accuracy
+		pred_labels = np.argmax(sess.run(fetches=y, feed_dict={x_pl: valid_data}), axis=1)
+		true_labels = utils.onehot_inverse(valid_labels)
+		conf_mat = confusion_matrix(true_labels, pred_labels, labels=range(10))
+
+		bal_valid_accuracy+=[utils.classbal_acc(conf_mat)]
                 # Reinitialize the intermediate loss and accuracy within epochs
                 _train_loss, _train_accuracy = [], []
                 # Print a summary of the training and validation
@@ -598,13 +603,25 @@ with tf.Session() as sess:
                     variables_names =[v.name for v in tf.trainable_variables()]
                     best_weights=sess.run(variables_names)
 
+                if bal_valid_accuracy[-1]==max(bal_valid_accuracy):
+                    #Updating the best quantities
+                    best_bal_train_loss = train_loss[-1]
+                    best_bal_train_accuracy = train_accuracy[-1]
+                    best_bal_valid_loss = valid_loss[-1]
+                    best_bal_valid_accuracy = bal_valid_accuracy[-1]
+                    best_bal_epoch = epoch
+                    # Weights
+                    variables_names = [v.name for v in tf.trainable_variables()]
+                    best_bal_weights = sess.run(variables_names)
                 # Update epoch
                 epoch += 1;
 
         #Save everything (all training history + the best values)
         mdict = {'train_loss': train_loss, 'train_accuracy': train_accuracy, 'valid_loss': valid_loss,
                  'valid_accuracy': valid_accuracy, 'best_train_loss': best_train_loss, 'best_train_accuracy': best_train_accuracy, 'best_valid_loss': best_valid_loss,
-                 'best_valid_accuracy': best_valid_accuracy, 'best_epoch': best_epoch}
+                 'best_valid_accuracy': best_valid_accuracy, 'best_epoch': best_epoch,
+                     'bal_valid_accuracy':bal_valid_accuracy,'best_bal_train_loss':best_bal_train_loss,'best_bal_train_accuracy':best_bal_train_accuracy,'best_bal_valid_loss':best_bal_valid_loss,
+                     'best_bal_valid_accuracy':best_bal_valid_accuracy,'best_bal_epoch':best_bal_epoch}
         scipy.io.savemat(save_path_perf+filename+"_ACCURACY", mdict)
 
         # Saving the weights
@@ -625,6 +642,22 @@ with tf.Session() as sess:
         print("weights (numpy arrays) saved under %s....: " % save_path_numpy_weights)
         print("... saving took {:10.2f} sec".format(time.time() - TIME_saving_start))
 
+	# Saving the weights
+	TIME_saving_start = time.time()
+	scipy.io.savemat(save_path_numpy_weights + filename + "_BAL_WEIGHTS", dict(
+                conv2d_1_kernel=best_bal_weights[0],
+                conv2d_1_bias=best_bal_weights[1],
+                conv2d_2_kernel=best_bal_weights[2],
+                conv2d_2_bias=best_bal_weights[3],
+                dense_1_kernel=best_bal_weights[4],
+                dense_1_bias=best_bal_weights[5],
+                dense_2_kernel=best_bal_weights[6],
+                dense_2_bias=best_bal_weights[7],
+                output_kernel=best_bal_weights[8],
+                output_bias=best_bal_weights[9]
+            ))
+	print("'balanced' weights (numpy arrays) saved under %s....: " % save_path_numpy_weights)
+	print("... saving took {:10.2f} sec".format(time.time() - TIME_saving_start))
     except KeyboardInterrupt:
         pass
 

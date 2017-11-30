@@ -334,6 +334,8 @@ with tf.Session() as sess:
 
                 train_data=merged_train_data
                 train_labels=merged_train_labels
+                del merged_train_data
+                del merged_train_labels
 
                 train_loader = bl.batch_loader(train_data, train_labels, batch_size, is_balanced = BALANCED_BATCHES, is_fast = RUN_FAST)
 
@@ -345,13 +347,11 @@ with tf.Session() as sess:
                 # Training loss and accuracy within an epoch (is erased at every new epoch)
                 _train_loss, _train_accuracy = [], []
                 valid_loss, valid_accuracy = [], []
-                test_loss, test_accuracy = [], []
 
                 ### TRAINING ###
                 TIME_epoch_start = time.time()
                 while (epoch < max_epochs):
                     train_batch_data, train_batch_labels = train_loader.next_batch()
-
                     feed_dict_train = {x_pl: train_batch_data, y_pl: train_batch_labels}
                     # deciding which parts to fetch, train_op makes the classifier "train"
                     fetches_train = [train_op, cross_entropy, accuracy]
@@ -426,9 +426,10 @@ with tf.Session() as sess:
 
             train_data = merged_train_data
             train_labels = merged_train_labels
-
+            del merged_train_data
+            del merged_train_labels
+            
             train_loader = bl.batch_loader(train_data, train_labels, batch_size, is_balanced = BALANCED_BATCHES, is_fast = RUN_FAST)
-
             valid_data = data_folds[k_valid]
             valid_labels = labels_folds[k_valid]
 
