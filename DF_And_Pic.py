@@ -545,7 +545,7 @@ with tf.Session() as sess:
         # Training loss and accuracy within an epoch (is erased at every new epoch)
         _train_loss, _train_accuracy = [], []
         valid_loss, valid_accuracy = [], []
-	bal_valid_accuracy = []
+        bal_valid_accuracy = []
         test_loss, test_accuracy = [], []
 
         ### TRAINING ###
@@ -575,12 +575,11 @@ with tf.Session() as sess:
                 valid_accuracy += [res[1]]
                 train_loss += [np.mean(_train_loss)]
                 train_accuracy += [np.mean(_train_accuracy)]
-		#Balanced validation accuracy
-		pred_labels = np.argmax(sess.run(fetches=y, feed_dict={x_pl: valid_data}), axis=1)
-		true_labels = utils.onehot_inverse(valid_labels)
-		conf_mat = confusion_matrix(true_labels, pred_labels, labels=range(10))
-
-		bal_valid_accuracy+=[utils.classbal_acc(conf_mat)]
+                #Balanced validation accuracy
+                pred_labels = np.argmax(sess.run(fetches=y, feed_dict={x_pl: valid_data}), axis=1)
+                true_labels = utils.onehot_inverse(valid_labels)
+                conf_mat = confusion_matrix(true_labels, pred_labels, labels=range(10))
+                bal_valid_accuracy+=[utils.classbal_acc(conf_mat)]
                 # Reinitialize the intermediate loss and accuracy within epochs
                 _train_loss, _train_accuracy = [], []
                 # Print a summary of the training and validation
@@ -615,7 +614,6 @@ with tf.Session() as sess:
                     best_bal_weights = sess.run(variables_names)
                 # Update epoch
                 epoch += 1;
-
         #Save everything (all training history + the best values)
         mdict = {'train_loss': train_loss, 'train_accuracy': train_accuracy, 'valid_loss': valid_loss,
                  'valid_accuracy': valid_accuracy, 'best_train_loss': best_train_loss, 'best_train_accuracy': best_train_accuracy, 'best_valid_loss': best_valid_loss,
@@ -628,36 +626,45 @@ with tf.Session() as sess:
         TIME_saving_start = time.time()
         print("performance saved under %s...." % save_path_perf)
         scipy.io.savemat(save_path_numpy_weights + filename + "_WEIGHTS", dict(
-            conv2d_1_kernel=best_weights[0],
-            conv2d_1_bias=best_weights[1],
-            conv2d_2_kernel=best_weights[2],
-            conv2d_2_bias=best_weights[3],
-            dense_1_kernel=best_weights[4],
-            dense_1_bias=best_weights[5],
-            dense_2_kernel=best_weights[6],
-            dense_2_bias=best_weights[7],
-            output_kernel=best_weights[8],
-            output_bias=best_weights[9]
+            DF_conv2d_1_kernel=best_weights[0],
+            DF_conv2d_1_bias=best_weights[1],
+            DF_conv2d_2_kernel=best_weights[2],
+            DF_conv2d_2_bias=best_weights[3],
+            PZ_conv2d_1_kernel=best_weights[4],
+            PZ_conv2d_1_bias=best_weights[5],
+            PZ_conv2d_2_kernel=best_weights[6],
+            PZ_conv2d_2_bias=best_weights[7],
+            dense_1_kernel=best_weights[8],
+            dense_1_bias=best_weights[9],
+            dense_2_kernel=best_weights[10],
+            dense_2_bias=best_weights[11],
+            output_kernel=best_weights[12],
+            output_bias=best_weights[13]
         ))
         print("weights (numpy arrays) saved under %s....: " % save_path_numpy_weights)
         print("... saving took {:10.2f} sec".format(time.time() - TIME_saving_start))
 
-	# Saving the weights
-	TIME_saving_start = time.time()
-	scipy.io.savemat(save_path_numpy_weights + filename + "_BAL_WEIGHTS", dict(
-                conv2d_1_kernel=best_bal_weights[0],
-                conv2d_1_bias=best_bal_weights[1],
-                conv2d_2_kernel=best_bal_weights[2],
-                conv2d_2_bias=best_bal_weights[3],
-                dense_1_kernel=best_bal_weights[4],
-                dense_1_bias=best_bal_weights[5],
-                dense_2_kernel=best_bal_weights[6],
-                dense_2_bias=best_bal_weights[7],
-                output_kernel=best_bal_weights[8],
-                output_bias=best_bal_weights[9]
-            ))
-	print("'balanced' weights (numpy arrays) saved under %s....: " % save_path_numpy_weights)
-	print("... saving took {:10.2f} sec".format(time.time() - TIME_saving_start))
+        # Saving the weights
+        # TIME_saving_start = time.time()
+        scipy.io.savemat(save_path_numpy_weights + filename + "_BAL_WEIGHTS", dict(
+            DF_conv2d_1_kernel=best_bal_weights[0],
+            DF_conv2d_1_bias=best_bal_weights[1],
+            DF_conv2d_2_kernel=best_bal_weights[2],
+            DF_conv2d_2_bias=best_bal_weights[3],
+            PZ_conv2d_1_kernel=best_bal_weights[4],
+            PZ_conv2d_1_bias=best_bal_weights[5],
+            PZ_conv2d_2_kernel=best_bal_weights[6],
+            PZ_conv2d_2_bias=best_bal_weights[7],
+            dense_1_kernel=best_bal_weights[8],
+            dense_1_bias=best_bal_weights[9],
+            dense_2_kernel=best_bal_weights[10],
+            dense_2_bias=best_bal_weights[11],
+            output_kernel=best_bal_weights[12],
+            output_bias=best_bal_weights[13]
+                ))
+        print("'balanced' weights (numpy arrays) saved under %s....: " % save_path_numpy_weights)
+        print("... saving took {:10.2f} sec".format(time.time() - TIME_saving_start))
+
     except KeyboardInterrupt:
         pass
 
