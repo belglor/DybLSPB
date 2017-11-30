@@ -32,6 +32,7 @@ tw_PZ = scipy.io.loadmat("results_mat/trainedweights/piczak_A_unbal_LR0-002_ME30
 #########################
 ### SETTING TRAINABILITY FLAGS
 DF_trainable = True
+
 PZ_1stCNN_trainable = True #Lars wnat this set to True
 PZ_2ndCNN_trainable = False
 PZ_FullyC_trainable = False
@@ -256,7 +257,8 @@ with tf.variable_scope('DF_convLayer1'):
                              #dilation_rate=1,
                              activation=tf.nn.relu,
                              use_bias=True,
-                             #kernel_initializer=None,
+                             kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None,
+                                                                                     dtype=tf.float32),
                              bias_initializer=tf.zeros_initializer(),
                              #kernel_regularizer=None,
                              #bias_regularizer=None,
@@ -294,7 +296,8 @@ with tf.variable_scope('DF_convLayer2'):
                              #dilation_rate=1,
                              activation=tf.nn.relu,
                              use_bias=True,
-                             #kernel_initializer=None,
+                             kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None,
+                                                                                     dtype=tf.float32),
                              bias_initializer=tf.zeros_initializer(),
                              #kernel_regularizer=None,
                              #bias_regularizer=None,
