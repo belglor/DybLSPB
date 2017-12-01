@@ -24,7 +24,7 @@ tf.reset_default_graph()
 
 # =============================================================================
 ### SETTING INITIALIZATION FLAGS
-DF_pretrained = False;
+DF_pretrained = True;
 PZ_pretrained = False;
 
 #Flags definition
@@ -195,10 +195,10 @@ filename="deepFourier_df{0}_dfcnn1{1}_dfcnn2{2}_pzcnn1{3}{4}_pzcnn2{5}{6}_pzfc1{
 ###   GET  TRAINED WEIGHTS   ###
 ################################
 if DF_pretrained:
-    pretrained_conv1d_1_kernel_DF = tw_DF['DF_conv1d_1_kernel']
-    pretrained_conv1d_1_bias_DF   = tw_DF['DF_conv1d_1_bias']
-    pretrained_conv1d_2_kernel_DF = tw_DF['DF_conv1d_2_kernel']
-    pretrained_conv1d_2_bias_DF   = tw_DF['DF_conv1d_2_bias']
+    pretrained_conv1d_1_kernel_DF = tw_DF['DF_conv2d_1_kernel']
+    pretrained_conv1d_1_bias_DF   = tw_DF['DF_conv2d_1_bias']
+    pretrained_conv1d_2_kernel_DF = tw_DF['DF_conv2d_2_kernel']
+    pretrained_conv1d_2_bias_DF   = tw_DF['DF_conv2d_2_bias']
 if PZ_pretrained:
     pretrained_conv2d_1_kernel_PZ = tw_PZ['conv2d_1_kernel']
     pretrained_conv2d_1_bias_PZ   = tw_PZ['conv2d_1_bias']
