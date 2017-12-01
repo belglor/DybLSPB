@@ -24,42 +24,26 @@ tf.reset_default_graph()
 
 # =============================================================================
 ### SETTING INITIALIZATION FLAGS
-DF_pretrained = True;
-PZ_pretrained = False;
 
-#Flags definition
-DF_load_conv1d_1 = False;
-DF_load_conv1d_2 = False;
+#Select which weights to load for DF!
+DF_toload_weights = "results_mat/trainedweights/deepFourier_dfT_cnn1T_cnn2N_fcN_A_unbal_LR0-002_ME2_WEIGHTS.mat"
+print('LOADING PRETRAINED DF: ' + DF_toload_weights)
+tw_DF = scipy.io.loadmat(DF_toload_weights);
+#Select which layers to load
+DF_load_conv1d_1 = True;
+DF_load_conv1d_2 = True;
+
+#Select which weights to load for PZ!
+PZ_toload_weights = "results_mat/trainedweights/piczak_A_unbal_LR0-002_ME300_WEIGHTS"
+print('LOADING PRETRAINED PZ: ' + PZ_toload_weights)
+tw_PZ = scipy.io.loadmat(PZ_toload_weights);
+#Select which layers to load
 PZ_load_conv2d_1 = False;
 PZ_load_conv2d_2 = False;
 PZ_load_dense_1  = False;
 PZ_load_dense_2  = False;
 PZ_load_output   = False;
-
-if DF_pretrained:
-    #Select which weights to load for DF!
-    DF_toload_weights = "results_mat/trainedweights/deepFourier_dfT_cnn1T_cnn2N_fcN_A_unbal_LR0-002_ME2_WEIGHTS.mat"
-    print('LOADING PRETRAINED DF: ' + DF_toload_weights)
-    tw_DF = scipy.io.loadmat(DF_toload_weights);
-    #Select which layers to load
-    DF_load_conv1d_1 = True;
-    DF_load_conv1d_2 = True;
-else:
-    print('REINITIALIZING DF WEIGHTS USING XAVIER INIT')
-if PZ_pretrained:
-    #Select which weights to load for PZ!
-    PZ_toload_weights = "results_mat/trainedweights/piczak_A_unbal_LR0-002_ME300_WEIGHTS"
-    print('LOADING PRETRAINED PZ: ' + PZ_toload_weights)
-    tw_PZ = scipy.io.loadmat(PZ_toload_weights);
-    #Select which layers to load
-    PZ_load_conv2d_1 = True;
-    PZ_load_conv2d_2 = True;
-    PZ_load_dense_1 = True;
-    PZ_load_dense_2 = True;
-    PZ_load_output =True;
-else:
-    print('REINITIALIZING PZ WEIGHTS USING XAVIER INIT')
-
+    
 # =============================================================================
 
 #%%
@@ -194,12 +178,12 @@ filename="deepFourier_df{0}_dfcnn1{1}_dfcnn2{2}_pzcnn1{3}{4}_pzcnn2{5}{6}_pzfc1{
 ################################
 ###   GET  TRAINED WEIGHTS   ###
 ################################
-if DF_pretrained:
+#Separate weights for DF
     pretrained_conv1d_1_kernel_DF = tw_DF['DF_conv2d_1_kernel']
     pretrained_conv1d_1_bias_DF   = tw_DF['DF_conv2d_1_bias']
     pretrained_conv1d_2_kernel_DF = tw_DF['DF_conv2d_2_kernel']
     pretrained_conv1d_2_bias_DF   = tw_DF['DF_conv2d_2_bias']
-if PZ_pretrained:
+#Separate weights for PZ
     pretrained_conv2d_1_kernel_PZ = tw_PZ['conv2d_1_kernel']
     pretrained_conv2d_1_bias_PZ   = tw_PZ['conv2d_1_bias']
     pretrained_conv2d_2_kernel_PZ = tw_PZ['conv2d_2_kernel']
