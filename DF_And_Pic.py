@@ -23,7 +23,43 @@ from sklearn.metrics import confusion_matrix
 tf.reset_default_graph()
 
 # =============================================================================
-tw_PZ = scipy.io.loadmat("results_mat/trainedweights/piczak_A_unbal_LR0-002_ME300_WEIGHTS" ) #can be found on Google Drive
+### SETTING INITIALIZATION FLAGS
+DF_pretrained = False;
+PZ_pretrained = False;
+
+#Flags definition
+DF_load_conv1d_1 = False;
+DF_load_conv1d_2 = False;
+PZ_load_conv2d_1 = False;
+PZ_load_conv2d_2 = False;
+PZ_load_dense_1  = False;
+PZ_load_dense_2  = False;
+PZ_load_output   = False;
+
+if DF_pretrained:
+    #Select which weights to load for DF!
+    DF_toload_weights = "results_mat/trainedweights/deepFourier_dfT_cnn1T_cnn2N_fcN_A_unbal_LR0-002_ME2_WEIGHTS.mat"
+    print('LOADING PRETRAINED DF: ' + DF_toload_weights)
+    tw_DF = scipy.io.loadmat(DF_toload_weights);
+    #Select which layers to load
+    DF_load_conv1d_1 = True;
+    DF_load_conv1d_2 = True;
+else:
+    print('REINITIALIZING DF WEIGHTS USING XAVIER INIT')
+if PZ_pretrained:
+    #Select which weights to load for PZ!
+    PZ_toload_weights = "results_mat/trainedweights/piczak_A_unbal_LR0-002_ME300_WEIGHTS"
+    print('LOADING PRETRAINED PZ: ' + PZ_toload_weights)
+    tw_PZ = scipy.io.loadmat(PZ_toload_weights);
+    #Select which layers to load
+    PZ_load_conv2d_1 = True;
+    PZ_load_conv2d_2 = True;
+    PZ_load_dense_1 = True;
+    PZ_load_dense_2 = True;
+    PZ_load_output =True;
+else:
+    print('REINITIALIZING PZ WEIGHTS USING XAVIER INIT')
+
 # =============================================================================
 
 #%%
@@ -32,7 +68,6 @@ tw_PZ = scipy.io.loadmat("results_mat/trainedweights/piczak_A_unbal_LR0-002_ME30
 #########################
 ### SETTING TRAINABILITY FLAGS
 DF_trainable = True
-
 PZ_1stCNN_trainable = True #Lars wnat this set to True
 PZ_2ndCNN_trainable = False
 PZ_FullyC_trainable = False
@@ -95,6 +130,7 @@ for directory in [save_path_perf,save_path_numpy_weights]:
 #Filename definition
 word_cv='A'
 
+#Trainability labels
 if DF_trainable:
     word_df='T'
 else:
@@ -111,7 +147,37 @@ if PZ_FullyC_trainable:
     word_fc='T'
 else:
     word_fc='N'
-
+    
+#Weight loading\initialization labels
+if DF_load_conv1d_1:
+   word_dfcnn1 = "L"
+else:
+   word_dfcnn1 = "X"
+if DF_load_conv1d_2:
+   word_dfcnn2 = "L"
+else:
+   word_dfcnn2 = "X"
+       
+if PZ_load_conv2d_1:
+   word_pzcnn1 = "L"
+else:
+   word_pzcnn1 = "X"  
+if PZ_load_conv2d_2:
+   word_pzcnn2 = "L"
+else:
+   word_pzcnn2 = "X"
+if PZ_load_dense_1:
+   word_pzfc1 = "L"
+else:
+   word_pzfc1 = "X" 
+if PZ_load_dense_2:
+   word_pzfc2 = "L"
+else:
+   word_pzfc2 = "X" 
+if PZ_load_output:
+   word_pzout = "L"
+else:
+   word_pzout = "X" 
 
 if BALANCED_BATCHES:
     word_bal='bal'
@@ -121,22 +187,29 @@ else:
 word_lr = str(learning_rate)
 word_lr=word_lr[:1]+'-'+word_lr[2:]
 
-filename="deepFourier_df{0}_cnn1{1}_cnn2{2}_fc{3}_{4}_{5}_LR{6}_ME{7}".format(word_df,word_cnn1,word_cnn2,word_fc,word_cv,word_bal,word_lr,max_epochs)
-
+#Filename typesetting:
+# deepFourier_df{trainable}_dfcnn1{init}_dfcnn2{init}_pzcnn1{trainable}{init}_pzcnn2{trainable}{init}_pzfc1{trainable}{init}_pzfc2{trainable}{init}_pzout{init}_{word_cv}_{word_bal}_LR{word_lr}_ME{max_epochs}
+filename="deepFourier_df{0}_dfcnn1{1}_dfcnn2{2}_pzcnn1{3}{4}_pzcnn2{5}{6}_pzfc1{7}{8}_pzfc2{9}{10}_pzout{11}_{12}_{13}_LR{14}_ME{15}".format(word_df,word_dfcnn1,word_dfcnn2,word_cnn1,word_pzcnn1,word_cnn2,word_pzcnn2,word_fc,word_pzfc1,word_fc,word_pzfc2,word_pzout,word_cv,word_bal,word_lr,max_epochs)
 #%%
 ################################
 ###   GET  TRAINED WEIGHTS   ###
 ################################
-pretrained_conv2d_1_kernel_PZ = tw_PZ['conv2d_1_kernel']
-pretrained_conv2d_1_bias_PZ   = tw_PZ['conv2d_1_bias']
-pretrained_conv2d_2_kernel_PZ = tw_PZ['conv2d_2_kernel']
-pretrained_conv2d_2_bias_PZ =   tw_PZ['conv2d_2_bias']
-pretrained_dense_1_kernel_PZ =  tw_PZ['dense_1_kernel']
-pretrained_dense_1_bias_PZ =    tw_PZ['dense_1_bias']
-pretrained_dense_2_kernel_PZ =  tw_PZ['dense_2_kernel']
-pretrained_dense_2_bias_PZ =    tw_PZ['dense_2_bias']
-pretrained_output_kernel_PZ =   tw_PZ['output_kernel']
-pretrained_output_bias_PZ =     tw_PZ['output_bias']
+if DF_pretrained:
+    pretrained_conv1d_1_kernel_DF = tw_DF['DF_conv1d_1_kernel']
+    pretrained_conv1d_1_bias_DF   = tw_DF['DF_conv1d_1_bias']
+    pretrained_conv1d_2_kernel_DF = tw_DF['DF_conv1d_2_kernel']
+    pretrained_conv1d_2_bias_DF   = tw_DF['DF_conv1d_2_bias']
+if PZ_pretrained:
+    pretrained_conv2d_1_kernel_PZ = tw_PZ['conv2d_1_kernel']
+    pretrained_conv2d_1_bias_PZ   = tw_PZ['conv2d_1_bias']
+    pretrained_conv2d_2_kernel_PZ = tw_PZ['conv2d_2_kernel']
+    pretrained_conv2d_2_bias_PZ   = tw_PZ['conv2d_2_bias']
+    pretrained_dense_1_kernel_PZ  = tw_PZ['dense_1_kernel']
+    pretrained_dense_1_bias_PZ    = tw_PZ['dense_1_bias']
+    pretrained_dense_2_kernel_PZ  = tw_PZ['dense_2_kernel']
+    pretrained_dense_2_bias_PZ    = tw_PZ['dense_2_bias']
+    pretrained_output_kernel_PZ   = tw_PZ['output_kernel']
+    pretrained_output_bias_PZ     = tw_PZ['output_bias']
 
 #%%
 ##############################
@@ -248,7 +321,9 @@ with tf.variable_scope('DF_convLayer1'):
     
     ### CONV1 LAYER
     # Layer build
-    z1 = tf.layers.conv1d(   inputs=x_pl,
+    ### CHECK IF WEIGHT LOADING\INITIALIZE
+    if DF_load_conv1d_1:
+        z1 = tf.layers.conv1d(   inputs=x_pl,
                              filters=DF_filters_1,
                              kernel_size=DF_kernel_size_1,
                              strides=DF_strides_conv1,
@@ -257,8 +332,29 @@ with tf.variable_scope('DF_convLayer1'):
                              #dilation_rate=1,
                              activation=tf.nn.relu,
                              use_bias=True,
-                             kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None,
-                                                                                     dtype=tf.float32),
+                             kernel_initializer=tf.constant_initializer(pretrained_conv1d_1_kernel_DF),
+                             bias_initializer=tf.constant_initializer(pretrained_conv1d_1_bias_DF),
+                             #kernel_regularizer=None,
+                             #bias_regularizer=None,
+                             #activity_regularizer=None,
+                             #kernel_constraint=None,
+                             #bias_constraint=None,
+                             trainable=True,
+                             name="DF_conv_1",
+                             #reuse=None
+                            )
+        print('Pretrained DF_conv1d_1 loaded!')
+    else:
+        z1 = tf.layers.conv1d(   inputs=x_pl,
+                             filters=DF_filters_1,
+                             kernel_size=DF_kernel_size_1,
+                             strides=DF_strides_conv1,
+                             padding=DF_padding_conv1,
+                             #data_format='channels_last',
+                             #dilation_rate=1,
+                             activation=tf.nn.relu,
+                             use_bias=True,
+                             kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None,dtype=tf.float32),
                              bias_initializer=tf.zeros_initializer(),
                              #kernel_regularizer=None,
                              #bias_regularizer=None,
@@ -269,6 +365,8 @@ with tf.variable_scope('DF_convLayer1'):
                              name="DF_conv_1",
                              #reuse=None
                             )
+        print('DF_conv1d_1 reinitialized!')
+
     # Input pass, activation 
     print('DF_conv1 \t\t', z1.get_shape())                     
                             
@@ -283,31 +381,57 @@ with tf.variable_scope('DF_convLayer1'):
     a1 = (pool1(z1)) 
     print('DF_pool1 \t\t', a1.get_shape())
     
-with tf.variable_scope('DF_convLayer2'):    
+with tf.variable_scope('DF_convLayer2'): 
     ### CONV2 LAYER
     print("--- Deep Fourier conv layer 2")
-    # Layer build
-    z2 = tf.layers.conv1d(   inputs=a1,
-                             filters=DF_filters_2,
-                             kernel_size=DF_kernel_size_2,
-                             strides=DF_strides_conv2,
-                             padding=DF_padding_conv2,
-                             #data_format='channels_last',
-                             #dilation_rate=1,
-                             activation=tf.nn.relu,
-                             use_bias=True,
-                             kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None,
-                                                                                     dtype=tf.float32),
-                             bias_initializer=tf.zeros_initializer(),
-                             #kernel_regularizer=None,
-                             #bias_regularizer=None,
-                             #activity_regularizer=None,
-                             #kernel_constraint=None,
-                             #bias_constraint=None,
-                             trainable=True,
-                             name="DF_conv_2",
-                             #reuse=None
-                            )
+    ### CHECK IF WEIGHT LOADING\INITIALIZE
+    if DF_load_conv1d_2:
+        # Layer build
+        z2 = tf.layers.conv1d(   inputs=a1,
+                                 filters=DF_filters_2,
+                                 kernel_size=DF_kernel_size_2,
+                                 strides=DF_strides_conv2,
+                                 padding=DF_padding_conv2,
+                                 #data_format='channels_last',
+                                 #dilation_rate=1,
+                                 activation=tf.nn.relu,
+                                 use_bias=True,
+                                 kernel_initializer=tf.constant_initializer(pretrained_conv1d_2_kernel_DF),
+                                 bias_initializer=tf.constant_initializer(pretrained_conv1d_2_bias_DF),
+                                 #kernel_regularizer=None,
+                                 #bias_regularizer=None,
+                                 #activity_regularizer=None,
+                                 #kernel_constraint=None,
+                                 #bias_constraint=None,
+                                 trainable=True,
+                                 name="DF_conv_2",
+                                 #reuse=None
+                                ) 
+        print('Pretrained DF_conv1d_2 loaded!')
+    else:
+        # Layer build
+        z2 = tf.layers.conv1d(   inputs=a1,
+                                 filters=DF_filters_2,
+                                 kernel_size=DF_kernel_size_2,
+                                 strides=DF_strides_conv2,
+                                 padding=DF_padding_conv2,
+                                 #data_format='channels_last',
+                                 #dilation_rate=1,
+                                 activation=tf.nn.relu,
+                                 use_bias=True,
+                                 kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None,dtype=tf.float32),
+                                 bias_initializer=tf.zeros_initializer(),
+                                 #kernel_regularizer=None,
+                                 #bias_regularizer=None,
+                                 #activity_regularizer=None,
+                                 #kernel_constraint=None,
+                                 #bias_constraint=None,
+                                 trainable=True,
+                                 name="DF_conv_2",
+                                 #reuse=None
+                                ) 
+        print('DF_conv1d_2 reinitialized!')
+  
     # Input pass, activation 
     print('DF_conv2 \t\t', z2.get_shape())                     
                             
@@ -329,8 +453,10 @@ with tf.variable_scope('DF_convLayer2'):
 ### PICZAK NETWORK
 # Convolutional layers
 with tf.variable_scope('PZ_convLayer1'):
-    print("--- Piczak")
-    conv1 = tf.layers.conv2d(
+    ### CHECK IF WEIGHT LOADING\INITIALIZE
+    if PZ_load_conv2d_1:
+        print("--- Piczak")
+        conv1 = tf.layers.conv2d(
         kernel_initializer=tf.constant_initializer(pretrained_conv2d_1_kernel_PZ),
         bias_initializer=tf.constant_initializer(pretrained_conv2d_1_bias_PZ),
         inputs=a2, ### NB!!! This is the output of the Deep_Fourier Network
@@ -340,6 +466,21 @@ with tf.variable_scope('PZ_convLayer1'):
         padding=padding_1,
         activation=tf.nn.relu,
         kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_1))
+        print('Pretrained PZ_conv2d_1 loaded!')
+    else:
+        print("--- Piczak")
+        conv1 = tf.layers.conv2d(
+        kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None,dtype=tf.float32),
+        bias_initializer=tf.zeros_initializer(),
+        inputs=a2, ### NB!!! This is the output of the Deep_Fourier Network
+        filters=n_filter_1,
+        kernel_size=kernel_size_1,
+        strides=kernel_strides_1,
+        padding=padding_1,
+        activation=tf.nn.relu,
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_1))
+        print('PZ_conv2d_1 reinitialized!')
+
     x=conv1 
     print('PZ_conv1 \t\t', x.get_shape())
     pool1 = max_pool2d(x, kernel_size=pool_size_1,stride=pool_strides_1, padding=padding_1)
@@ -348,7 +489,9 @@ with tf.variable_scope('PZ_convLayer1'):
     x = tf.nn.dropout(x,dropout_1)
 
 with tf.variable_scope('PZ_convLayer2'):
-    conv2 = tf.layers.conv2d(
+    ### CHECK IF WEIGHT LOADING\INITIALIZE
+    if PZ_load_conv2d_2:
+        conv2 = tf.layers.conv2d(
         kernel_initializer=tf.constant_initializer(pretrained_conv2d_2_kernel_PZ),
         bias_initializer=tf.constant_initializer(pretrained_conv2d_2_bias_PZ),
         inputs=x,
@@ -358,6 +501,20 @@ with tf.variable_scope('PZ_convLayer2'):
         padding=padding_2,
         activation=tf.nn.relu,
         kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_2))
+        print('Pretrained PZ_conv2d_2 loaded!')
+    else:
+        conv2 = tf.layers.conv2d(
+        kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None,dtype=tf.float32),
+        bias_initializer=tf.zeros_initializer(),
+        inputs=x,
+        filters=n_filter_2,
+        kernel_size=kernel_size_2,
+        strides=kernel_strides_2,
+        padding=padding_2,
+        activation=tf.nn.relu,
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_2))
+        print('PZ_conv2d_2 reinitialized!')
+        
     x = conv2
     print('PZ_conv2 \t\t', x.get_shape())
     pool2 = max_pool2d(x,kernel_size=pool_size_2, stride=pool_strides_2, padding=padding_2)
@@ -370,20 +527,36 @@ with tf.variable_scope('PZ_convLayer2'):
 
 # Dense layers
 with tf.variable_scope('PZ_denseLayer3'):
-    dense3 = tf.layers.dense(
+    ### CHECK IF WEIGHT LOADING\INITIALIZE
+    if PZ_load_dense_1:
+        dense3 = tf.layers.dense(
         kernel_initializer=tf.constant_initializer(pretrained_dense_1_kernel_PZ),
         bias_initializer=tf.constant_initializer(pretrained_dense_1_bias_PZ),
         inputs=x,
         units=num_units_3,
         activation=tf.nn.relu,
         kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_3),
-    )
+        )
+        print('Pretrained PZ_dense_1 loaded!')
+    else:
+        dense3 = tf.layers.dense(
+        kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None,dtype=tf.float32),
+        bias_initializer=tf.zeros_initializer(),
+        inputs=x,
+        units=num_units_3,
+        activation=tf.nn.relu,
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_3),
+        )    
+        print('PZ_dense_1 reinitialized!')
+
     x = dense3
     print('PZ_dense3 \t\t', x.get_shape())
     x = tf.nn.dropout(x,dropout_3)
 
 with tf.variable_scope('PZ_denseLayer4'):
-    dense4 = tf.layers.dense(
+    ### CHECK IF WEIGHT LOADING\INITIALIZE
+    if PZ_load_dense_2:
+        dense4 = tf.layers.dense(
         kernel_initializer=tf.constant_initializer(pretrained_dense_2_kernel_PZ),
         bias_initializer=tf.constant_initializer(pretrained_dense_2_bias_PZ),
         inputs=x,
@@ -392,13 +565,29 @@ with tf.variable_scope('PZ_denseLayer4'):
         #kernel_initializer=None,
         #bias_initializer=tf.zeros_initializer(),
         kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_4),
-    )
+        )
+        print('Pretrained PZ_dense_2 loaded!')
+    else:
+        dense4 = tf.layers.dense(
+        kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None,dtype=tf.float32),
+        bias_initializer=tf.zeros_initializer(),
+        inputs=x,
+        units=num_units_4,
+        activation=tf.nn.relu,
+        #kernel_initializer=None,
+        #bias_initializer=tf.zeros_initializer(),
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_4),
+        )
+        print('PZ_dense_2 reinitialized!')
+
     x = dense4
     print('PZ_dense4 \t\t', x.get_shape())
     x = tf.nn.dropout(x, dropout_4)
 
 with tf.variable_scope('PZ_output_layer'):
-    dense_out = tf.layers.dense(
+    ### CHECK IF WEIGHT LOADING\INITIALIZE
+    if PZ_load_output:
+        dense_out = tf.layers.dense(
         kernel_initializer=tf.constant_initializer(pretrained_output_kernel_PZ),
         bias_initializer=tf.constant_initializer(pretrained_output_bias_PZ),
         inputs=x,
@@ -407,7 +596,21 @@ with tf.variable_scope('PZ_output_layer'):
         #kernel_initializer=None,
         #bias_initializer=tf.zeros_initializer(),
         kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_output),
-    )
+        )
+        print('Pretrained PZ_output loaded!')
+    else:
+        dense_out = tf.layers.dense(
+        kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None,dtype=tf.float32),
+        bias_initializer=tf.zeros_initializer(),
+        inputs=x,
+        units=num_classes,
+        activation=None,
+        #kernel_initializer=None,
+        #bias_initializer=tf.zeros_initializer(),
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=l2_output),
+        )
+        print('PZ_output reinitialized!')
+        
     y = tf.nn.softmax(dense_out)
     print('denseOut\t', y.get_shape())
     
