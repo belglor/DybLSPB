@@ -24,42 +24,46 @@ from sklearn.metrics import confusion_matrix
 tf.reset_default_graph()
 
 # =============================================================================
-our_good_filename = "piczak_A_unbal_LRx-xxxx_MExxx" #<-- the experiment name of interest
-include_DF = False # <-- if True, we include the DF part as well, because we calculate the test error on the whole DF+PZ net
+our_good_filename = "WITH_PURE_DF_PRETRAINING_deepFourier_dfN_dfcnn1L_dfcnn2L_pzcnn1TX_pzcnn2TX_pzfc1TX_pzfc2TX_pzoutX_A_unbal_LR0-002_ME300" #<-- the experiment name of interest
+include_DF = True # <-- if True, we include the DF part as well, because we calculate the test error on the whole DF+PZ net
 # =============================================================================
 
 k_test = 10
 data_folder = "./data/"
-tw_PZ = scipy.io.loadmat("./results_mat/trainedweights/" + our_good_filename + "_WEIGHTS.mat")
+tw = scipy.io.loadmat("./results_mat/trainedweights/" + our_good_filename + "_WEIGHTS.mat")
 save_path_perf = "./results_mat/performance/" + our_good_filename + "_TESTERROR.mat"
-
-
 
 ################################
 ###   GET  TRAINED WEIGHTS   ###
 ################################
-pretrained_conv2d_1_kernel_PZ = tw_PZ['conv2d_1_kernel']
-pretrained_conv2d_1_bias_PZ   = tw_PZ['conv2d_1_bias']
-pretrained_conv2d_2_kernel_PZ = tw_PZ['conv2d_2_kernel']
-pretrained_conv2d_2_bias_PZ =   tw_PZ['conv2d_2_bias']
-pretrained_dense_1_kernel_PZ =  tw_PZ['dense_1_kernel']
-pretrained_dense_1_bias_PZ =    tw_PZ['dense_1_bias']
-pretrained_dense_2_kernel_PZ =  tw_PZ['dense_2_kernel']
-pretrained_dense_2_bias_PZ =    tw_PZ['dense_2_bias']
-pretrained_output_kernel_PZ =   tw_PZ['output_kernel']
-pretrained_output_bias_PZ =     tw_PZ['output_bias']
+if include_DF:
+    pretrained_conv1d_1_kernel_DF = tw['DF_conv1d_1_kernel']
+    pretrained_conv1d_1_bias_DF =tw['DF_conv1d_1_bias']
+    pretrained_conv1d_2_kernel_DF =tw['DF_conv1d_2_kernel']
+    pretrained_conv1d_2_bias_DF =tw['DF_conv1d_2_bias']
+
+pretrained_conv2d_1_kernel_PZ = tw['PZ_conv2d_1_kernel']
+pretrained_conv2d_1_bias_PZ   = tw['PZ_conv2d_1_bias']
+pretrained_conv2d_2_kernel_PZ = tw['PZ_conv2d_2_kernel']
+pretrained_conv2d_2_bias_PZ =   tw['PZ_conv2d_2_bias']
+pretrained_dense_1_kernel_PZ =  tw['dense_1_kernel']
+pretrained_dense_1_bias_PZ =    tw['dense_1_bias']
+pretrained_dense_2_kernel_PZ =  tw['dense_2_kernel']
+pretrained_dense_2_bias_PZ =    tw['dense_2_bias']
+pretrained_output_kernel_PZ =   tw['output_kernel']
+pretrained_output_bias_PZ =     tw['output_bias']
 
 
 ##############################
 ###   NETWORK PARAMETERS   ###
 ##############################
+nchannels = 1  # ??? Maybe two because stereo audiofiles?
 
 if include_DF:
     ###GENERAL VARIABLES
     # Input data size
-    length = 20992  #k0 
-    nchannels = 1  #??? Maybe two because stereo audiofiles?
-    
+    length = 20992  # k0
+
     ###DEEP_FOURIER LAYERS HYPERPARAMETERS
     # Conv1, MaxPool1 parameters
     DF_padding_conv1 = "valid"
@@ -83,6 +87,12 @@ if include_DF:
 # Bands : related to frequencies. Frames : related to audio sequence. 2 channels (the spec and the delta's)
 bands, frames, n_channels = 60, 41, 1
 image_shape = [bands,frames,n_channels]
+
+#INPUT PLACEHOLDER
+if include_DF:
+    x_pl_1 = tf.placeholder(tf.float32, [None, length, nchannels], name='xPlaceholder_1')
+else:
+    x_pl_1 = tf.placeholder(tf.float32, [None, bands, frames, nchannels], name='xPlaceholder_1')
 
 # First convolutional ReLU layer
 n_filter_1 = 80
@@ -138,8 +148,7 @@ l2_output=0.001
 learning_rate=0.01
 momentum=0.9
 
-###PLACEHOLDER VARIABLES
-x_pl_1 = tf.placeholder(tf.float32, [None, length, nchannels], name='xPlaceholder_1')
+###OUTPUT PLACEHOLDER VARIABLES
 y_pl = tf.placeholder(tf.float64, [None, num_classes], name='yPlaceholder')
 y_pl = tf.cast(y_pl, tf.float32)
 
@@ -169,8 +178,8 @@ if include_DF:
                                  #dilation_rate=1,
                                  activation=tf.nn.relu,
                                  use_bias=True,
-                                 #kernel_initializer=None,
-                                 bias_initializer=tf.zeros_initializer(),
+                                 kernel_initializer=tf.constant_initializer(pretrained_conv1d_1_kernel_DF),
+                                 bias_initializer=tf.constant_initializer(pretrained_conv1d_1_bias_DF),
                                  #kernel_regularizer=None,
                                  #bias_regularizer=None,
                                  #activity_regularizer=None,
@@ -207,8 +216,8 @@ if include_DF:
                                  #dilation_rate=1,
                                  activation=tf.nn.relu,
                                  use_bias=True,
-                                 #kernel_initializer=None,
-                                 bias_initializer=tf.zeros_initializer(),
+                                 kernel_initializer=tf.constant_initializer(pretrained_conv1d_2_kernel_DF),
+                                 bias_initializer=tf.constant_initializer(pretrained_conv1d_2_bias_DF),
                                  #kernel_regularizer=None,
                                  #bias_regularizer=None,
                                  #activity_regularizer=None,
@@ -235,7 +244,10 @@ if include_DF:
         a2 = tf.expand_dims(a2, axis=3)
         #a2 = tf.reshape(a2, )
         print('DF_pool2 \t\t', a2.get_shape())
-    
+
+else:
+    a2=x_pl_1
+
 ### PICZAK NETWORK
 # Convolutional layers
 with tf.variable_scope('PZ_convLayer1'):
