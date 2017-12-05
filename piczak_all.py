@@ -114,7 +114,7 @@ kernel_strides_1=(1,1)
 #L2 weight decay
 l2_1=0.001
 
-#Dropout rate before pooling
+#Dropout rate after pooling
 dropout_1=0.5
 
 pool_size_1 = (4,3)

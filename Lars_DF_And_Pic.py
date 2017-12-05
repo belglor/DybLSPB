@@ -33,17 +33,18 @@ tw_DF = scipy.io.loadmat(DF_toload_weights);
 # Select which layers to load
 DF_load_conv1d_1 = False;
 DF_load_conv1d_2 = False;
+DF_load_conv1d_3 = False;
 
 # Select which weights to load for PZ!
 PZ_toload_weights = "results_mat/trainedweights/piczak_A_unbal_LR0-002_ME300_WEIGHTS"
 print('LOADING PRETRAINED PZ: ' + PZ_toload_weights)
 tw_PZ = scipy.io.loadmat(PZ_toload_weights);
 # Select which layers to load
-PZ_load_conv2d_1 = False;
-PZ_load_conv2d_2 = False;
-PZ_load_dense_1 = False;
-PZ_load_dense_2 = False;
-PZ_load_output = False;
+PZ_load_conv2d_1 = True;
+PZ_load_conv2d_2 = True;
+PZ_load_dense_1 = True;
+PZ_load_dense_2 = True;
+PZ_load_output = True;
 
 # =============================================================================
 
@@ -53,16 +54,16 @@ PZ_load_output = False;
 #########################
 ### SETTING TRAINABILITY FLAGS
 DF_trainable = True
-PZ_1stCNN_trainable = True  # Lars wnat this set to True
-PZ_2ndCNN_trainable = True
-PZ_FullyC_trainable = True
+PZ_1stCNN_trainable = False  # Lars wnat this set to True
+PZ_2ndCNN_trainable = False
+PZ_FullyC_trainable = False
 
 n_fold = 10
 # Folds we validate and test on (only relevant if RUN_CV==False). Indices of the folds are in the "Matlab" naming mode
 k_valid = 9
 k_test = 10
 # If we just want to test quickly on a few epochs
-RUN_FAST = False
+RUN_FAST = True
 # If we want oversampled (balanced) mini-batches or not
 BALANCED_BATCHES = False
 # Learning rate
@@ -142,6 +143,11 @@ if DF_load_conv1d_2:
     word_dfcnn2 = "L"
 else:
     word_dfcnn2 = "X"
+if DF_load_conv1d_3:
+    word_dfcnn3 = "L"
+else:
+    word_dfcnn3 = "X"
+
 
 if PZ_load_conv2d_1:
     word_pzcnn1 = "L"
@@ -174,18 +180,23 @@ word_lr = word_lr[:1] + '-' + word_lr[2:]
 
 # Filename typesetting:
 # deepFourier_df{trainable}_dfcnn1{init}_dfcnn2{init}_pzcnn1{trainable}{init}_pzcnn2{trainable}{init}_pzfc1{trainable}{init}_pzfc2{trainable}{init}_pzout{init}_{word_cv}_{word_bal}_LR{word_lr}_ME{max_epochs}
-filename = "deepFourier_df{0}_dfcnn1{1}_dfcnn2{2}_pzcnn1{3}{4}_pzcnn2{5}{6}_pzfc1{7}{8}_pzfc2{9}{10}_pzout{11}_{12}_{13}_LR{14}_ME{15}".format(
-    word_df, word_dfcnn1, word_dfcnn2, word_cnn1, word_pzcnn1, word_cnn2, word_pzcnn2, word_fc, word_pzfc1, word_fc,
+filename = "LarsDeepFourier_df{0}_dfcnn1{1}_dfcnn2{2}_dfcnn3{3}_pzcnn1{4}{5}_pzcnn2{6}{7}_pzfc1{8}{9}_pzfc2{10}{11}_pzout{12}_{13}_{14}_LR{15}_ME{16}".format(
+    word_df, word_dfcnn1, word_dfcnn2, word_dfcnn3, word_cnn1, word_pzcnn1, word_cnn2, word_pzcnn2, word_fc, word_pzfc1, word_fc,
     word_pzfc2, word_pzout, word_cv, word_bal, word_lr, max_epochs)
 # %%
 ################################
 ###   GET  TRAINED WEIGHTS   ###
 ################################
+Ole_has_nice_hair = False
 # Separate weights for DF
-pretrained_conv1d_1_kernel_DF = tw_DF['DF_conv1d_1_kernel']
-pretrained_conv1d_1_bias_DF = tw_DF['DF_conv1d_1_bias']
-pretrained_conv1d_2_kernel_DF = tw_DF['DF_conv1d_2_kernel']
-pretrained_conv1d_2_bias_DF = tw_DF['DF_conv1d_2_bias']
+if Ole_has_nice_hair:
+    pretrained_conv1d_1_kernel_DF = tw_DF['DF_conv1d_1_kernel']
+    pretrained_conv1d_1_bias_DF = tw_DF['DF_conv1d_1_bias']
+    pretrained_conv1d_2_kernel_DF = tw_DF['DF_conv1d_2_kernel']
+    pretrained_conv1d_2_bias_DF = tw_DF['DF_conv1d_2_bias']
+    pretrained_conv1d_3_kernel_DF = tw_DF['DF_conv1d_3_kernel']
+    pretrained_conv1d_3_bias_DF = tw_DF['DF_conv1d_3_bias']
+
 # Separate weights for PZ
 pretrained_conv2d_1_kernel_PZ = tw_PZ['conv2d_1_kernel']
 pretrained_conv2d_1_bias_PZ = tw_PZ['conv2d_1_bias']
@@ -209,23 +220,23 @@ length = 20992  # k0
 nchannels = 1  # ??? Maybe two because stereo audiofiles?
 
 ###DEEP_FOURIER LAYERS HYPERPARAMETERS
-# Conv1, MaxPool1 parameters
-DF_padding_conv1 = "valid"
-DF_filters_1 = 80  # phi1
-DF_kernel_size_1 = 155
-DF_strides_conv1 = 10
-DF_padding_pool1 = "valid"
-DF_pool_size_1 = 9
-DF_strides_pool1 = 3
+# Conv1
+DF_padding_conv1 = "same"
+DF_filters_1 = 512  # phi1
+DF_kernel_size_1 = 1024
+DF_strides_conv1 = 512
 
-# Conv2, MaxPool2 parameters
-DF_padding_conv2 = 'valid'
-DF_filters_2 = 60  # phi2
-DF_kernel_size_2 = 15
-DF_strides_conv2 = 4
-DF_padding_pool2 = 'valid'
-DF_pool_size_2 = 9
-DF_strides_pool2 = 4
+# Conv2
+DF_padding_conv2 = 'same'
+DF_filters_2 = 256  # phi2
+DF_kernel_size_2 = 3
+DF_strides_conv2 = 1
+
+# Conv3
+DF_padding_conv3 = 'same'
+DF_filters_3 = 60  # phi3
+DF_kernel_size_3 = 3
+DF_strides_conv3 = 1
 
 ###PICZACK HYPERPARAMETERS
 # Bands : related to frequencies. Frames : related to audio sequence. 2 channels (the spec and the delta's)
@@ -357,24 +368,13 @@ with tf.variable_scope('DF_convLayer1'):
     # Input pass, activation
     print('DF_conv1 \t\t', z1.get_shape())
 
-    ### MAX_POOL1
-    pool1 = MaxPooling1D(pool_size=DF_pool_size_1,
-                         strides=DF_strides_pool1,
-                         padding=DF_padding_pool1,
-                         name='DF_pool_1'
-                         )
-
-    # Activation pass, pooling
-    a1 = (pool1(z1))
-    print('DF_pool1 \t\t', a1.get_shape())
-
 with tf.variable_scope('DF_convLayer2'):
     ### CONV2 LAYER
     print("--- Deep Fourier conv layer 2")
     ### CHECK IF WEIGHT LOADING\INITIALIZE
     if DF_load_conv1d_2:
         # Layer build
-        z2 = tf.layers.conv1d(inputs=a1,
+        z2 = tf.layers.conv1d(inputs=z1,
                               filters=DF_filters_2,
                               kernel_size=DF_kernel_size_2,
                               strides=DF_strides_conv2,
@@ -397,7 +397,7 @@ with tf.variable_scope('DF_convLayer2'):
         print('Pretrained DF_conv1d_2 loaded!')
     else:
         # Layer build
-        z2 = tf.layers.conv1d(inputs=a1,
+        z2 = tf.layers.conv1d(inputs=z1,
                               filters=DF_filters_2,
                               kernel_size=DF_kernel_size_2,
                               strides=DF_strides_conv2,
@@ -423,20 +423,64 @@ with tf.variable_scope('DF_convLayer2'):
     # Input pass, activation
     print('DF_conv2 \t\t', z2.get_shape())
 
-    ### MAX_POOL2
-    pool2 = MaxPooling1D(pool_size=DF_pool_size_2,
-                         strides=DF_strides_pool2,
-                         padding=DF_padding_pool2,
-                         name='DF_pool_2'
-                         )
+with tf.variable_scope('DF_convLayer3'):
+    ### CONV2 LAYER
+    print("--- Deep Fourier conv layer 3")
+    ### CHECK IF WEIGHT LOADING\INITIALIZE
+    if DF_load_conv1d_3:
+        # Layer build
+        z3 = tf.layers.conv1d(inputs=z2,
+                              filters=DF_filters_3,
+                              kernel_size=DF_kernel_size_3,
+                              strides=DF_strides_conv3,
+                              padding=DF_padding_conv3,
+                              # data_format='channels_last',
+                              # dilation_rate=1,
+                              activation=tf.nn.tanh,
+                              use_bias=True,
+                              kernel_initializer=tf.constant_initializer(pretrained_conv1d_3_kernel_DF),
+                              bias_initializer=tf.constant_initializer(pretrained_conv1d_3_bias_DF),
+                              # kernel_regularizer=None,
+                              # bias_regularizer=None,
+                              # activity_regularizer=None,
+                              # kernel_constraint=None,
+                              # bias_constraint=None,
+                              trainable=True,
+                              name="DF_conv_3",
+                              # reuse=None
+                              )
+        print('Pretrained DF_conv1d_3 loaded!')
+    else:
+        # Layer build
+        z3 = tf.layers.conv1d(inputs=z2,
+                              filters=DF_filters_3,
+                              kernel_size=DF_kernel_size_3,
+                              strides=DF_strides_conv3,
+                              padding=DF_padding_conv3,
+                              # data_format='channels_last',
+                              # dilation_rate=1,
+                              activation=tf.nn.tanh,
+                              use_bias=True,
+                              kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None,
+                                                                                      dtype=tf.float32),
+                              bias_initializer=tf.zeros_initializer(),
+                              # kernel_regularizer=None,
+                              # bias_regularizer=None,
+                              # activity_regularizer=None,
+                              # kernel_constraint=None,
+                              # bias_constraint=None,
+                              trainable=True,
+                              name="DF_conv_3",
+                              # reuse=None
+                              )
+        print('DF_conv1d_3 reinitialized!')
 
-    # Activation pass, pooling
-    a2 = (pool2(z2))
+    # Input pass, activation
     # Reshaping to swtich dimension and get them right (to 41x60 to 60x41x1)
-    a2 = tf.transpose(a2, perm=[0, 2, 1])
-    a2 = tf.expand_dims(a2, axis=3)
-    # a2 = tf.reshape(a2, )
-    print('DF_pool2 \t\t', a2.get_shape())
+    z3 = tf.transpose(z3, perm=[0, 2, 1])
+    z3 = tf.expand_dims(z3, axis=3)
+
+    print('DF_conv3 \t\t', z3.get_shape())
 
 ### PICZAK NETWORK
 # Convolutional layers
@@ -447,7 +491,7 @@ with tf.variable_scope('PZ_convLayer1'):
         conv1 = tf.layers.conv2d(
             kernel_initializer=tf.constant_initializer(pretrained_conv2d_1_kernel_PZ),
             bias_initializer=tf.constant_initializer(pretrained_conv2d_1_bias_PZ),
-            inputs=a2,  ### NB!!! This is the output of the Deep_Fourier Network
+            inputs=z3,  ### NB!!! This is the output of the Deep_Fourier Network
             filters=n_filter_1,
             kernel_size=kernel_size_1,
             strides=kernel_strides_1,
@@ -460,7 +504,7 @@ with tf.variable_scope('PZ_convLayer1'):
         conv1 = tf.layers.conv2d(
             kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None, dtype=tf.float32),
             bias_initializer=tf.zeros_initializer(),
-            inputs=a2,  ### NB!!! This is the output of the Deep_Fourier Network
+            inputs=z3,  ### NB!!! This is the output of the Deep_Fourier Network
             filters=n_filter_1,
             kernel_size=kernel_size_1,
             strides=kernel_strides_1,
@@ -612,16 +656,16 @@ all_vars = tf.trainable_variables()
 
 ### SLICING VARIABLES
 # Deep Fourier training variables
-DF_trainable_stuff = all_vars[0:4]
+DF_trainable_stuff = all_vars[0:6]
 
 # Piczak (1st CNN) training variables
-PZ_1stCNN_trainable_stuff = all_vars[4:6]
+PZ_1stCNN_trainable_stuff = all_vars[6:8]
 
 # Piczak (2nd CNN) training variables
-PZ_2ndCNN_trainable_stuff = all_vars[6:8]
+PZ_2ndCNN_trainable_stuff = all_vars[8:10]
 
 # Piczak (Fully Connected) training variables
-PZ_FullyC_trainable_stuff = all_vars[8:]
+PZ_FullyC_trainable_stuff = all_vars[10:12]
 
 ### CREATING LIST OF VARIABLES TO TRAIN
 to_train = list()
@@ -827,16 +871,18 @@ with tf.Session() as sess:
             DF_conv1d_1_bias=best_weights[1],
             DF_conv1d_2_kernel=best_weights[2],
             DF_conv1d_2_bias=best_weights[3],
-            PZ_conv2d_1_kernel=best_weights[4],
-            PZ_conv2d_1_bias=best_weights[5],
-            PZ_conv2d_2_kernel=best_weights[6],
-            PZ_conv2d_2_bias=best_weights[7],
-            dense_1_kernel=best_weights[8],
-            dense_1_bias=best_weights[9],
-            dense_2_kernel=best_weights[10],
-            dense_2_bias=best_weights[11],
-            output_kernel=best_weights[12],
-            output_bias=best_weights[13]
+            DF_conv1d_3_kernel=best_weights[4],
+            DF_conv1d_3_bias=best_weights[5],
+            PZ_conv2d_1_kernel=best_weights[6],
+            PZ_conv2d_1_bias=best_weights[7],
+            PZ_conv2d_2_kernel=best_weights[8],
+            PZ_conv2d_2_bias=best_weights[9],
+            dense_1_kernel=best_weights[10],
+            dense_1_bias=best_weights[11],
+            dense_2_kernel=best_weights[12],
+            dense_2_bias=best_weights[13],
+            output_kernel=best_weights[14],
+            output_bias=best_weights[15]
         ))
         print("weights (numpy arrays) saved under %s....: " % save_path_numpy_weights)
         print("... saving took {:10.2f} sec".format(time.time() - TIME_saving_start))
@@ -848,16 +894,18 @@ with tf.Session() as sess:
             DF_conv1d_1_bias=best_bal_weights[1],
             DF_conv1d_2_kernel=best_bal_weights[2],
             DF_conv1d_2_bias=best_bal_weights[3],
-            PZ_conv2d_1_kernel=best_bal_weights[4],
-            PZ_conv2d_1_bias=best_bal_weights[5],
-            PZ_conv2d_2_kernel=best_bal_weights[6],
-            PZ_conv2d_2_bias=best_bal_weights[7],
-            dense_1_kernel=best_bal_weights[8],
-            dense_1_bias=best_bal_weights[9],
-            dense_2_kernel=best_bal_weights[10],
-            dense_2_bias=best_bal_weights[11],
-            output_kernel=best_bal_weights[12],
-            output_bias=best_bal_weights[13]
+            DF_conv1d_3_kernel=best_bal_weights[4],
+            DF_conv1d_3_bias=best_bal_weights[5],
+            PZ_conv2d_1_kernel=best_bal_weights[6],
+            PZ_conv2d_1_bias=best_bal_weights[7],
+            PZ_conv2d_2_kernel=best_bal_weights[8],
+            PZ_conv2d_2_bias=best_bal_weights[9],
+            dense_1_kernel=best_bal_weights[10],
+            dense_1_bias=best_bal_weights[11],
+            dense_2_kernel=best_bal_weights[12],
+            dense_2_bias=best_bal_weights[13],
+            output_kernel=best_bal_weights[14],
+            output_bias=best_bal_weights[15]
         ))
         print("'balanced' weights (numpy arrays) saved under %s....: " % save_path_numpy_weights)
         print("... saving took {:10.2f} sec".format(time.time() - TIME_saving_start))
