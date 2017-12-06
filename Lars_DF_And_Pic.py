@@ -26,10 +26,13 @@ tf.reset_default_graph()
 # =============================================================================
 ### SETTING INITIALIZATION FLAGS
 
+LOAD_PRETRAINED_DF = False #this is temporary, because the loaded DF mat file does not have all the needed entries yet
+
 # Select which weights to load for DF!
-DF_toload_weights = "results_mat/trainedweights/deepFourier_dfT_dfcnn1X_dfcnn2X_pzcnn1TX_pzcnn2NL_pzfc1NL_pzfc2NL_pzoutL_A_unbal_LR0-002_ME300_WEIGHTS.mat"
-print('LOADING PRETRAINED DF: ' + DF_toload_weights)
-tw_DF = scipy.io.loadmat(DF_toload_weights);
+if LOAD_PRETRAINED_DF:
+    DF_toload_weights = "results_mat/trainedweights/deepFourier_dfT_dfcnn1X_dfcnn2X_pzcnn1TX_pzcnn2NL_pzfc1NL_pzfc2NL_pzoutL_A_unbal_LR0-002_ME300_WEIGHTS.mat"
+    print('LOADING PRETRAINED DF: ' + DF_toload_weights)
+    tw_DF = scipy.io.loadmat(DF_toload_weights);
 # Select which layers to load
 DF_load_conv1d_1 = False;
 DF_load_conv1d_2 = False;
@@ -73,6 +76,8 @@ max_epochs_fast = 2
 max_epochs_regular = 300
 # Batch size
 batch_size = 1000
+
+USE_LR_DECAY = True #learning rate decay: exponentially decreasing the learning rate over the epochs, so that we do not overshoot the (local) optimum when we get close
 
 #########################
 ###   PRE-WORK WORK!  ###
@@ -174,22 +179,24 @@ if BALANCED_BATCHES:
     word_bal = 'bal'
 else:
     word_bal = 'unbal'
+    
+if USE_LR_DECAY: word_lrd = "_LRD"
+else: word_lrd = ""
 
 word_lr = str(learning_rate)
 word_lr = word_lr[:1] + '-' + word_lr[2:]
 
 # Filename typesetting:
 # deepFourier_df{trainable}_dfcnn1{init}_dfcnn2{init}_pzcnn1{trainable}{init}_pzcnn2{trainable}{init}_pzfc1{trainable}{init}_pzfc2{trainable}{init}_pzout{init}_{word_cv}_{word_bal}_LR{word_lr}_ME{max_epochs}
-filename = "LarsDeepFourier_df{0}_dfcnn1{1}_dfcnn2{2}_dfcnn3{3}_pzcnn1{4}{5}_pzcnn2{6}{7}_pzfc1{8}{9}_pzfc2{10}{11}_pzout{12}_{13}_{14}_LR{15}_ME{16}".format(
+filename = "LarsDeepFourier_df{0}_dfcnn1{1}_dfcnn2{2}_dfcnn3{3}_pzcnn1{4}{5}_pzcnn2{6}{7}_pzfc1{8}{9}_pzfc2{10}{11}_pzout{12}_{13}_{14}_LR{15}_ME{16}{17}".format(
     word_df, word_dfcnn1, word_dfcnn2, word_dfcnn3, word_cnn1, word_pzcnn1, word_cnn2, word_pzcnn2, word_fc, word_pzfc1, word_fc,
-    word_pzfc2, word_pzout, word_cv, word_bal, word_lr, max_epochs)
+    word_pzfc2, word_pzout, word_cv, word_bal, word_lr, max_epochs, word_lrd)
 # %%
 ################################
 ###   GET  TRAINED WEIGHTS   ###
 ################################
-Ole_has_nice_hair = False
 # Separate weights for DF
-if Ole_has_nice_hair:
+if LOAD_PRETRAINED_DF:
     pretrained_conv1d_1_kernel_DF = tw_DF['DF_conv1d_1_kernel']
     pretrained_conv1d_1_bias_DF = tw_DF['DF_conv1d_1_bias']
     pretrained_conv1d_2_kernel_DF = tw_DF['DF_conv1d_2_kernel']
@@ -689,10 +696,17 @@ with tf.variable_scope('loss'):
     cross_entropy = tf.reduce_mean(cross_entropy)
 
 with tf.variable_scope('training'):
-    # defining our optimizer
-    sgd = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=momentum, use_nesterov=True)
-    # applying the gradients
-    train_op = sgd.minimize(cross_entropy, var_list=to_train)
+    if USE_LR_DECAY:
+        theGlobalStep = tf.Variable(0, trainable=False)
+        # defining our optimizer
+        upgradedLR = tf.train.exponential_decay(learning_rate=learning_rate, global_step=theGlobalStep, decay_steps=50, decay_rate=.97, staircase=True) 
+        sgd = tf.train.MomentumOptimizer(learning_rate=upgradedLR, momentum=momentum, use_nesterov=True)
+        # applying the gradients
+        train_op = sgd.minimize(cross_entropy, var_list=to_train, global_step=theGlobalStep)
+    else:
+        sgd = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=momentum, use_nesterov=True)
+        train_op = sgd.minimize(cross_entropy, var_list=to_train)
+        
 
 with tf.variable_scope('performance'):
     # making a one-hot encoded vector of correct (1) and incorrect (0) predictions
