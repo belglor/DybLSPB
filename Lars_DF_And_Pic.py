@@ -52,9 +52,10 @@ PZ_load_output = True;
 # =============================================================================
 
 # %%
-#########################
-###   CODE SETTINGS   ###
-#########################
+#..................................
+###################################
+###   CODE SETTINGS   #############
+###################################
 ### SETTING TRAINABILITY FLAGS
 DF_trainable = True
 PZ_1stCNN_trainable = False  # Lars wnat this set to True
@@ -78,6 +79,13 @@ max_epochs_regular = 300
 batch_size = 1000
 
 USE_LR_DECAY = True #learning rate decay: exponentially decreasing the learning rate over the epochs, so that we do not overshoot the (local) optimum when we get close
+NAME_SAFETY_PREFIX = "deleteMe_" #set this to "" for normal behaviour. Set it to any other string if you are just testing things and want to avvoid overwriting important stuff
+###################################
+###  END OF CODE SETTINGS   #######
+###################################
+#..................................
+
+# =============================================================================
 
 #########################
 ###   PRE-WORK WORK!  ###
@@ -188,7 +196,7 @@ word_lr = word_lr[:1] + '-' + word_lr[2:]
 
 # Filename typesetting:
 # deepFourier_df{trainable}_dfcnn1{init}_dfcnn2{init}_pzcnn1{trainable}{init}_pzcnn2{trainable}{init}_pzfc1{trainable}{init}_pzfc2{trainable}{init}_pzout{init}_{word_cv}_{word_bal}_LR{word_lr}_ME{max_epochs}
-filename = "LarsDeepFourier_df{0}_dfcnn1{1}_dfcnn2{2}_dfcnn3{3}_pzcnn1{4}{5}_pzcnn2{6}{7}_pzfc1{8}{9}_pzfc2{10}{11}_pzout{12}_{13}_{14}_LR{15}_ME{16}{17}".format(
+filename = NAME_SAFETY_PREFIX + "LarsDeepFourier_df{0}_dfcnn1{1}_dfcnn2{2}_dfcnn3{3}_pzcnn1{4}{5}_pzcnn2{6}{7}_pzfc1{8}{9}_pzfc2{10}{11}_pzout{12}_{13}_{14}_LR{15}_ME{16}{17}".format(
     word_df, word_dfcnn1, word_dfcnn2, word_dfcnn3, word_cnn1, word_pzcnn1, word_cnn2, word_pzcnn2, word_fc, word_pzfc1, word_fc,
     word_pzfc2, word_pzout, word_cv, word_bal, word_lr, max_epochs, word_lrd)
 # %%
@@ -694,6 +702,10 @@ with tf.variable_scope('loss'):
     cross_entropy = -tf.reduce_sum(y_pl * tf.log(y + 1e-8), reduction_indices=[1])
     # averaging over samples
     cross_entropy = tf.reduce_mean(cross_entropy)
+    calculate_gradient_norms_l1, calculate_gradient_norms_l2 = [], []
+    for j in range(len(all_vars)):
+        calculate_gradient_norms_l1.append(tf.norm(tf.gradients(cross_entropy, all_vars[j]), 1, name="gradnorm_l1_%d"%j))
+        calculate_gradient_norms_l2.append(tf.norm(tf.gradients(cross_entropy, all_vars[j]), 2, name="gradnorm_l2_%d"%j))
 
 with tf.variable_scope('training'):
     if USE_LR_DECAY:
@@ -724,7 +736,8 @@ x_test_forward = np.random.normal(0, 1, [50, 20992, 1]).astype('float32')  # dum
 y_dummy_train = utils.onehot(np.random.randint(0, 10, 50), 10)
 
 # This hell line
-gpu_opts = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
+if RUN_FAST: gpu_opts = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)# don't kill the laptop
+else: gpu_opts = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
 
 sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_opts))
 sess.run(tf.global_variables_initializer())
@@ -741,14 +754,23 @@ print('Forward pass successful!')
 # Folds creation : lists with all the np.array's inside
 data_folds = []
 labels_folds = []
+if RUN_FAST: small_data = batch_size // 10 + 5
 for i in range(1, 11):
-    data_mat = scipy.io.loadmat(data_folder + 'fold{}_wav.mat'.format(i))
-    # Add one dimension for being eligible for the network
-    data_mat = np.expand_dims(data_mat['ob_wav'], axis=-1)
+    if RUN_FAST: 
+        data_mat = np.random.normal(0, 1, [small_data, 20992, 1]).astype('float32')
+    else: 
+        data_mat = scipy.io.loadmat(data_folder + 'fold{}_wav.mat'.format(i))    
+        # Add one dimension for being eligible for the network
+        data_mat = np.expand_dims(data_mat['ob_wav'], axis=-1)
     data_folds.append(data_mat)
-    labels_mat = scipy.io.loadmat(data_folder + 'fold{}_labels.mat'.format(i))
-    labels_mat = utils.onehot(np.transpose(labels_mat['lb']), num_classes)  # One-hot encoding labels
+    del data_mat #unburden the memory
+    if RUN_FAST: 
+        labels_mat = utils.onehot(np.random.randint(0, 10, small_data), 10)
+    else: 
+        labels_mat = scipy.io.loadmat(data_folder + 'fold{}_labels.mat'.format(i))
+        labels_mat = utils.onehot(np.transpose(labels_mat['lb']), num_classes)  # One-hot encoding labels
     labels_folds.append(labels_mat)
+    del labels_mat #unburden the memory
 
 # %%
 ##########################
@@ -786,6 +808,7 @@ with tf.Session() as sess:
 
         train_data = merged_train_data
         train_labels = merged_train_labels
+        del merged_train_data, merged_train_labels
 
         train_loader = bl.batch_loader(train_data, train_labels, batch_size, is_balanced=BALANCED_BATCHES,
                                        is_fast=RUN_FAST)
@@ -797,6 +820,8 @@ with tf.Session() as sess:
         train_loss, train_accuracy = [], []
         # Training loss and accuracy within an epoch (is erased at every new epoch)
         _train_loss, _train_accuracy = [], []
+        _gradientnorms_l1 = np.empty((0, len(all_vars)), float)
+        _gradientnorms_l2 = np.empty((0, len(all_vars)), float)
         valid_loss, valid_accuracy = [], []
         bal_valid_accuracy = []
         test_loss, test_accuracy = [], []
@@ -807,13 +832,14 @@ with tf.Session() as sess:
             train_batch_data, train_batch_labels = train_loader.next_batch()
             feed_dict_train = {x_pl: train_batch_data, y_pl: train_batch_labels}
             # deciding which parts to fetch, train_op makes the classifier "train"
-            fetches_train = [train_op, cross_entropy, accuracy]
+            fetches_train = [calculate_gradient_norms_l1, calculate_gradient_norms_l2, train_op, cross_entropy, accuracy]
             # running the train_op and computing the updated training loss and accuracy
             res = sess.run(fetches=fetches_train, feed_dict=feed_dict_train)
             # storing cross entropy (second fetch argument, so index=1)
-            _train_loss += [res[1]]
-            _train_accuracy += [res[2]]
-
+            _train_loss += [res[3]]
+            _train_accuracy += [res[4]]
+            _gradientnorms_l1 = np.vstack((_gradientnorms_l1, np.array(res[0])))
+            _gradientnorms_l2 = np.vstack((_gradientnorms_l2, np.array(res[1])))
             ### VALIDATING ###
             # When we reach the last mini-batch of the epoch
             if train_loader.is_epoch_done():
@@ -836,8 +862,7 @@ with tf.Session() as sess:
                 # Reinitialize the intermediate loss and accuracy within epochs
                 _train_loss, _train_accuracy = [], []
                 # Print a summary of the training and validation
-                print(
-                    "Epoch {} : Train Loss {:6.3f}, Train acc {:6.3f},  Valid loss {:6.3f},  Valid acc {:6.3f}, took {:10.2f} sec".format(
+                print("Epoch {} : Train Loss {:6.3f}, Train acc {:6.3f},  Valid loss {:6.3f},  Valid acc {:6.3f}, took {:10.2f} sec".format(
                         epoch, train_loss[-1], train_accuracy[-1], valid_loss[-1], valid_accuracy[-1],
                         time.time() - TIME_epoch_start))
                 print("")
@@ -876,6 +901,7 @@ with tf.Session() as sess:
                  'best_bal_train_accuracy': best_bal_train_accuracy, 'best_bal_valid_loss': best_bal_valid_loss,
                  'best_bal_valid_accuracy': best_bal_valid_accuracy, 'best_bal_epoch': best_bal_epoch}
         scipy.io.savemat(save_path_perf + filename + "_ACCURACY", mdict)
+        scipy.io.savemat(save_path_perf + filename + "_GRADIENTNORMS", {'GN_L1': _gradientnorms_l1, 'GN_L2': _gradientnorms_l2})
 
         # Saving the weights
         TIME_saving_start = time.time()
