@@ -79,6 +79,7 @@ max_epochs_regular = 300
 batch_size = 1000
 STORE_GRADIENT_NORMS = False
 USE_LR_DECAY = False #learning rate decay: exponentially decreasing the learning rate over the epochs, so that we do not overshoot the (local) optimum when we get close
+learning_rate_END = .0001 #if USE_LR_DECAY is set to True, then the learning rate will exponentially decay at every epoch and will reach learning_rate_END at the last epoch
 NAME_SAFETY_PREFIX = "" #set this to "" for normal behaviour. Set it to any other string if you are just testing things and want to avvoid overwriting important stuff
 nskip_iter_GN = 20 #every nskip_iter_GN'th iteration we will take one measurement of the gradient L2 norm (measuring it at every iteration takes too much comp. time)  
 ###################################
@@ -108,7 +109,12 @@ else:
     print('{0} epochs to be run'.format(max_epochs))
 
 print('"A" method with validation on fold' + str(k_valid) + 'and test on fold' + str(k_test))
-print('Learning rate : {0}'.format(learning_rate))
+if USE_LR_DECAY:
+    LRD_FACTOR = (learning_rate_END/learning_rate)**(1./(max_epochs-1))
+    lr_array = learning_rate*(LRD_FACTOR**np.arange(max_epochs))
+else:
+    lr_array = learning_rate*np.ones(max_epochs, float) # learning rate stays constant
+print("the learning rate will start at {0} and end at {1}".format(lr_array[0], lr_array[-1]) )
 
 # Naming of output files
 # We just shift -1 the folds indices to match with Python way to think
@@ -706,16 +712,9 @@ with tf.variable_scope('loss'):
     if STORE_GRADIENT_NORMS: calculate_gradient_norms_l2 = [ tf.norm(tf.gradients(cross_entropy, all_vars[j]), 2, name="gradnorm_l2_%d"%j) for j in range(len(all_vars)) ]
 
 with tf.variable_scope('training'):
-    if USE_LR_DECAY:
-        theGlobalStep = tf.Variable(0, trainable=False)
-        # defining our optimizer
-        upgradedLR = tf.train.exponential_decay(learning_rate=learning_rate, global_step=theGlobalStep, decay_steps=50, decay_rate=.97, staircase=True) 
-        sgd = tf.train.MomentumOptimizer(learning_rate=upgradedLR, momentum=momentum, use_nesterov=True)
-        # applying the gradients
-        train_op = sgd.minimize(cross_entropy, var_list=to_train, global_step=theGlobalStep)
-    else:
-        sgd = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=momentum, use_nesterov=True)
-        train_op = sgd.minimize(cross_entropy, var_list=to_train)
+    LR = tf.placeholder(tf.float64, shape=[]) #that way we can change the learning rate on the fly
+    sgd = tf.train.MomentumOptimizer(learning_rate=LR, momentum=momentum, use_nesterov=True)
+    train_op = sgd.minimize(cross_entropy, var_list=to_train)
         
 
 with tf.variable_scope('performance'):
@@ -774,7 +773,6 @@ for i in range(1, 11):
 ##########################
 ###   TRAINING LOOP    ###
 ##########################
-
 with tf.Session() as sess:
     # Cross-validation
     try:
@@ -809,8 +807,7 @@ with tf.Session() as sess:
         train_labels = merged_train_labels
         del merged_train_data, merged_train_labels
 
-        train_loader = bl.batch_loader(train_data, train_labels, batch_size, is_balanced=BALANCED_BATCHES,
-                                       is_fast=RUN_FAST)
+        train_loader = bl.batch_loader(train_data, train_labels, batch_size, is_balanced=BALANCED_BATCHES, is_fast=RUN_FAST)
 
         valid_data = data_folds[k_valid]
         valid_labels = labels_folds[k_valid]
@@ -828,7 +825,7 @@ with tf.Session() as sess:
         TIME_epoch_start = time.time()
         while (epoch < max_epochs):
             train_batch_data, train_batch_labels = train_loader.next_batch()
-            feed_dict_train = {x_pl: train_batch_data, y_pl: train_batch_labels}
+            feed_dict_train = {x_pl: train_batch_data, y_pl: train_batch_labels, LR: lr_array[epoch]}
             # running the train_op and computing the updated training loss and accuracy
             if STORE_GRADIENT_NORMS and iteration_ctr % nskip_iter_GN == 0:
                 res = sess.run(fetches=[calculate_gradient_norms_l2, train_op, cross_entropy, accuracy], feed_dict=feed_dict_train)
@@ -892,7 +889,6 @@ with tf.Session() as sess:
                     # Weights
                     variables_names = [v.name for v in tf.trainable_variables()]
                     best_bal_weights = sess.run(variables_names)
-                # Update epoch
                 epoch += 1;
         # Save everything (all training history + the best values)
         mdict = {'train_loss': train_loss, 'train_accuracy': train_accuracy, 'valid_loss': valid_loss,
