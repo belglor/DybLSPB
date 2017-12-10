@@ -1,8 +1,10 @@
 % Load activations
-load('./results_mat/performance/WITH_ACTIVATION_WITH_PURE_DF_PRETRAINING_deepFourier_dfN_dfcnn1L_dfcnn2L_pzcnn1TX_pzcnn2TX_pzfc1TX_pzfc2TX_pzoutX_A_unbal_LR0-002_ME300_BAL_TESTERROR.mat');
+%load('./results_mat/performance/WITH_ACTIVATION_WITH_PURE_DF_PRETRAINING_deepFourier_dfN_dfcnn1L_dfcnn2L_pzcnn1TX_pzcnn2TX_pzfc1TX_pzfc2TX_pzoutX_A_unbal_LR0-002_ME300_BAL_TESTERROR.mat');
 Ole1_activations = activation_DF2;
 
-load('./results_mat/performance/WITH_ACTIVATION_deepFourier_dfT_dfcnn1X_dfcnn2X_pzcnn1TL_pzcnn2NL_pzfc1NL_pzfc2NL_pzoutL_A_unbal_LR0-002_ME300_BAL_TESTERROR');
+% dove cazzo si trova quel file?
+%load('./results_mat/performance/WITH_ACTIVATION_deepFourier_dfT_dfcnn1X_dfcnn2X_pzcnn1TL_pzcnn2NL_pzfc1NL_pzfc2NL_pzoutL_A_unbal_LR0-002_ME300_BAL_TESTERROR');
+%%
 Lars1_activations = activation_DF2;
 
 % Load spectrograms

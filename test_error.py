@@ -12,7 +12,6 @@ import utils
 import scipy.io
 import batch_loader as bl
 import tensorflow as tf
-import time
 from tensorflow.contrib.layers import fully_connected, convolution2d, flatten, batch_norm, max_pool2d, dropout
 from tensorflow.python.ops.nn import relu, elu, relu6, sigmoid, tanh, softmax
 from tensorflow.python.ops.nn import dynamic_rnn
@@ -24,8 +23,10 @@ from sklearn.metrics import confusion_matrix
 tf.reset_default_graph()
 
 # =============================================================================
-our_good_filename = "WITH_PURE_DF_PRETRAINING_deepFourier_dfN_dfcnn1L_dfcnn2L_pzcnn1TX_pzcnn2TX_pzfc1TX_pzfc2TX_pzoutX_A_unbal_LR0-002_ME300" #<-- the experiment name of interest
-include_DF = True # <-- if True, we include the DF part as well, because we calculate the test error on the whole DF+PZ net
+our_good_filename = "LarsDeepFourier_dfT_dfcnn1X_dfcnn2X_dfcnn3X_pzcnn1TL_pzcnn2NL_pzfc1NL_pzfc2NL_pzoutL_A_unbal_LR0-005_ME300_LRD" #<-- the experiment name of interest
+#if one of them is True, we include the DF part as well, because we calculate the test error on the whole DF+PZ net
+include_DF_HeurNet = False
+include_DF_MST = True 
 # =============================================================================
 
 k_test = 10
@@ -36,12 +37,14 @@ save_path_perf = "./results_mat/performance/" + our_good_filename + "_TESTERROR.
 ################################
 ###   GET  TRAINED WEIGHTS   ###
 ################################
-if include_DF:
+if include_DF_HeurNet or include_DF_MST:
     pretrained_conv1d_1_kernel_DF = tw['DF_conv1d_1_kernel']
     pretrained_conv1d_1_bias_DF =tw['DF_conv1d_1_bias']
     pretrained_conv1d_2_kernel_DF =tw['DF_conv1d_2_kernel']
     pretrained_conv1d_2_bias_DF =tw['DF_conv1d_2_bias']
-
+if include_DF_MST:
+    pretrained_conv1d_3_kernel_DF =tw['DF_conv1d_3_kernel']
+    pretrained_conv1d_3_bias_DF =tw['DF_conv1d_3_bias']
 pretrained_conv2d_1_kernel_PZ = tw['PZ_conv2d_1_kernel']
 pretrained_conv2d_1_bias_PZ   = tw['PZ_conv2d_1_bias']
 pretrained_conv2d_2_kernel_PZ = tw['PZ_conv2d_2_kernel']
@@ -59,12 +62,12 @@ pretrained_output_bias_PZ =     tw['output_bias']
 ##############################
 nchannels = 1  # ??? Maybe two because stereo audiofiles?
 
-if include_DF:
-    ###GENERAL VARIABLES
-    # Input data size
-    length = 20992  # k0
+###GENERAL VARIABLES
+# Input data size
+length = 20992  # k0
 
-    ###DEEP_FOURIER LAYERS HYPERPARAMETERS
+###DEEP_FOURIER LAYERS HYPERPARAMETERS
+if include_DF_HeurNet:
     # Conv1, MaxPool1 parameters
     DF_padding_conv1 = "valid"
     DF_filters_1 = 80 #phi1
@@ -72,8 +75,7 @@ if include_DF:
     DF_strides_conv1 = 10
     DF_padding_pool1 = "valid"
     DF_pool_size_1 = 9
-    DF_strides_pool1 = 3
-    
+    DF_strides_pool1 = 3   
     # Conv2, MaxPool2 parameters
     DF_padding_conv2 = 'valid'
     DF_filters_2 = 60 #phi2
@@ -83,13 +85,30 @@ if include_DF:
     DF_pool_size_2 = 9
     DF_strides_pool2 = 4
 
+if include_DF_MST:
+    # Conv1
+    DF_padding_conv1 = "same"
+    DF_filters_1 = 512  # phi1
+    DF_kernel_size_1 = 1024
+    DF_strides_conv1 = 512   
+    # Conv2
+    DF_padding_conv2 = 'same'
+    DF_filters_2 = 256  # phi2
+    DF_kernel_size_2 = 3
+    DF_strides_conv2 = 1   
+    # Conv3
+    DF_padding_conv3 = 'same'
+    DF_filters_3 = 60  # phi3
+    DF_kernel_size_3 = 3
+    DF_strides_conv3 = 1
+    
 ###PICZACK HYPERPARAMETERS
 # Bands : related to frequencies. Frames : related to audio sequence. 2 channels (the spec and the delta's)
 bands, frames, n_channels = 60, 41, 1
 image_shape = [bands,frames,n_channels]
 
 #INPUT PLACEHOLDER
-if include_DF:
+if include_DF_HeurNet or include_DF_MST:
     x_pl_1 = tf.placeholder(tf.float32, [None, length, nchannels], name='xPlaceholder_1')
 else:
     x_pl_1 = tf.placeholder(tf.float32, [None, bands, frames, nchannels], name='xPlaceholder_1')
@@ -144,10 +163,6 @@ num_classes=10
 #activation_output="softmax"
 l2_output=0.001
 
-#Learning rate
-learning_rate=0.01
-momentum=0.9
-
 ###OUTPUT PLACEHOLDER VARIABLES
 y_pl = tf.placeholder(tf.float64, [None, num_classes], name='yPlaceholder')
 y_pl = tf.cast(y_pl, tf.float32)
@@ -160,7 +175,7 @@ print('Trace of the tensors shape as it is propagated through the network.')
 print('Layer name \t Output size')
 print('----------------------------')
 
-if include_DF:
+if include_DF_HeurNet:
     ### DEEP FOURIER NETWORK
     with tf.variable_scope('DF_convLayer1'):
         ### INPUT DATA
@@ -244,8 +259,92 @@ if include_DF:
         a2 = tf.expand_dims(a2, axis=3)
         #a2 = tf.reshape(a2, )
         print('DF_pool2 \t\t', a2.get_shape())
+elif include_DF_MST:
+    with tf.variable_scope('DF_convLayer1'):
+        ### INPUT DATA
+        print("--- Deep Fourier conv layer 1")
+        print('x_pl_1 \t\t', x_pl_1.get_shape())
+        ### CONV1 LAYER
+        z1 = tf.layers.conv1d(inputs=x_pl_1,
+                              filters=DF_filters_1,
+                              kernel_size=DF_kernel_size_1,
+                              strides=DF_strides_conv1,
+                              padding=DF_padding_conv1,
+                              # data_format='channels_last',
+                              # dilation_rate=1,
+                              activation=tf.nn.relu,
+                              use_bias=True,
+                              kernel_initializer=tf.constant_initializer(pretrained_conv1d_1_kernel_DF),
+                              bias_initializer=tf.constant_initializer(pretrained_conv1d_1_bias_DF),
+                              # kernel_regularizer=None,
+                              # bias_regularizer=None,
+                              # activity_regularizer=None,
+                              # kernel_constraint=None,
+                              # bias_constraint=None,
+                              trainable=True,
+                              name="DF_conv_1",
+                              # reuse=None
+                              )
+        print('Pretrained DF_conv1d_1 loaded!')
+        print('DF_conv1 \t\t', z1.get_shape())
 
-else:
+    with tf.variable_scope('DF_convLayer2'):
+        ### CONV2 LAYER
+        print("--- Deep Fourier conv layer 2")
+        z2 = tf.layers.conv1d(inputs=z1,
+                              filters=DF_filters_2,
+                              kernel_size=DF_kernel_size_2,
+                              strides=DF_strides_conv2,
+                              padding=DF_padding_conv2,
+                              # data_format='channels_last',
+                              # dilation_rate=1,
+                              activation=tf.nn.relu,
+                              use_bias=True,
+                              kernel_initializer=tf.constant_initializer(pretrained_conv1d_2_kernel_DF),
+                              bias_initializer=tf.constant_initializer(pretrained_conv1d_2_bias_DF),
+                              # kernel_regularizer=None,
+                              # bias_regularizer=None,
+                              # activity_regularizer=None,
+                              # kernel_constraint=None,
+                              # bias_constraint=None,
+                              trainable=True,
+                              name="DF_conv_2",
+                              # reuse=None
+                              )
+        print('Pretrained DF_conv1d_2 loaded!')    
+        # Input pass, activation
+        print('DF_conv2 \t\t', z2.get_shape())
+
+    with tf.variable_scope('DF_convLayer3'):
+        ### CONV3 LAYER
+        print("--- Deep Fourier conv layer 3")
+        z3 = tf.layers.conv1d(inputs=z2,
+                              filters=DF_filters_3,
+                              kernel_size=DF_kernel_size_3,
+                              strides=DF_strides_conv3,
+                              padding=DF_padding_conv3,
+                              # data_format='channels_last',
+                              # dilation_rate=1,
+                              activation=tf.nn.tanh,
+                              use_bias=True,
+                              kernel_initializer=tf.constant_initializer(pretrained_conv1d_3_kernel_DF),
+                              bias_initializer=tf.constant_initializer(pretrained_conv1d_3_bias_DF),
+                              # kernel_regularizer=None,
+                              # bias_regularizer=None,
+                              # activity_regularizer=None,
+                              # kernel_constraint=None,
+                              # bias_constraint=None,
+                              trainable=True,
+                              name="DF_conv_3",
+                              # reuse=None
+                              )
+        print('Pretrained DF_conv1d_3 loaded!')
+        # Input pass, activation
+        # Reshaping to swtich dimension and get them right (to 41x60 to 60x41x1)
+        z3 = tf.transpose(z3, perm=[0, 2, 1])
+        a2 = tf.expand_dims(z3, axis=3)
+        print('DF_conv3 \t\t', a2.get_shape())
+else: #test error of standalone Piczak
     a2=x_pl_1
 
 ### PICZAK NETWORK
@@ -355,7 +454,7 @@ with tf.variable_scope('performance'):
 ###    TESTING on fold 10  ###
 ##############################
 
-if include_DF:
+if include_DF_HeurNet or include_DF_MST:
     test_data=scipy.io.loadmat(data_folder + 'fold{}_wav.mat'.format(k_test))
     test_data=np.expand_dims(test_data['ob_wav'],axis=-1)
 else:
@@ -363,6 +462,11 @@ else:
     test_data=np.expand_dims(test_data['ob_spcgm'],axis=-1)
 y_test_true=scipy.io.loadmat(data_folder + 'fold{}_labels.mat'.format(k_test))
 y_test_true=utils.onehot(np.transpose(y_test_true['lb']), num_classes) #One-hot encoding labels
+
+#just for testing
+#small_data = 27
+#test_data = np.random.normal(0, 1, [small_data, 20992, 1]).astype('float32')
+#y_test_true = utils.onehot(np.random.randint(0, 10, small_data), 10)
 
 # restricting memory usage, TensorFlow is greedy and will use all memory otherwise
 gpu_opts = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
@@ -387,6 +491,5 @@ cba = utils.classbal_acc(conf_mat)
 mdict = {'test_loss': test_loss, 'test_accuracy': test_accuracy, 'conf_mat': conf_mat, 'acc_classbal': cba}
 scipy.io.savemat(save_path_perf, mdict)
 print("performance saved under %s...." % save_path_perf)
-
 
 print("<><><><><><><><> the entire program finished without errors!! <><><><><><><><>")
