@@ -58,7 +58,7 @@ PZ_load_output = True;
 ###################################
 ### SETTING TRAINABILITY FLAGS
 DF_trainable = True
-PZ_1stCNN_trainable = False  # Lars wnat this set to True
+PZ_1stCNN_trainable = True  # True for Lars1, False for Ole1
 PZ_2ndCNN_trainable = False
 PZ_FullyC_trainable = False
 
@@ -71,15 +71,16 @@ RUN_FAST = True
 # If we want oversampled (balanced) mini-batches or not
 BALANCED_BATCHES = False
 # Learning rate
-learning_rate = 0.002
+learning_rate = 0.005
 # Number of epochs (only one is relevant acc. to which RUN_FAST value has been given)
 max_epochs_fast = 2
 max_epochs_regular = 300
 # Batch size
 batch_size = 1000
-
-USE_LR_DECAY = True #learning rate decay: exponentially decreasing the learning rate over the epochs, so that we do not overshoot the (local) optimum when we get close
-NAME_SAFETY_PREFIX = "deleteMe_" #set this to "" for normal behaviour. Set it to any other string if you are just testing things and want to avvoid overwriting important stuff
+STORE_GRADIENT_NORMS = False
+USE_LR_DECAY = False #learning rate decay: exponentially decreasing the learning rate over the epochs, so that we do not overshoot the (local) optimum when we get close
+NAME_SAFETY_PREFIX = "" #set this to "" for normal behaviour. Set it to any other string if you are just testing things and want to avvoid overwriting important stuff
+nskip_iter_GN = 20 #every nskip_iter_GN'th iteration we will take one measurement of the gradient L2 norm (measuring it at every iteration takes too much comp. time)  
 ###################################
 ###  END OF CODE SETTINGS   #######
 ###################################
@@ -702,10 +703,7 @@ with tf.variable_scope('loss'):
     cross_entropy = -tf.reduce_sum(y_pl * tf.log(y + 1e-8), reduction_indices=[1])
     # averaging over samples
     cross_entropy = tf.reduce_mean(cross_entropy)
-    calculate_gradient_norms_l1, calculate_gradient_norms_l2 = [], []
-    for j in range(len(all_vars)):
-        calculate_gradient_norms_l1.append(tf.norm(tf.gradients(cross_entropy, all_vars[j]), 1, name="gradnorm_l1_%d"%j))
-        calculate_gradient_norms_l2.append(tf.norm(tf.gradients(cross_entropy, all_vars[j]), 2, name="gradnorm_l2_%d"%j))
+    if STORE_GRADIENT_NORMS: calculate_gradient_norms_l2 = [ tf.norm(tf.gradients(cross_entropy, all_vars[j]), 2, name="gradnorm_l2_%d"%j) for j in range(len(all_vars)) ]
 
 with tf.variable_scope('training'):
     if USE_LR_DECAY:
@@ -787,7 +785,8 @@ with tf.Session() as sess:
 
         # We reinitialize the weights
         sess.run(tf.global_variables_initializer())
-        epoch = 0
+        epoch = iteration_ctr = 0
+        
 
         mask = [True] * n_fold
         for k in [k_valid, k_test]:
@@ -820,8 +819,7 @@ with tf.Session() as sess:
         train_loss, train_accuracy = [], []
         # Training loss and accuracy within an epoch (is erased at every new epoch)
         _train_loss, _train_accuracy = [], []
-        _gradientnorms_l1 = np.empty((0, len(all_vars)), float)
-        _gradientnorms_l2 = np.empty((0, len(all_vars)), float)
+        if STORE_GRADIENT_NORMS: _gradientnorms_l2 = np.empty((0, len(all_vars)), float)
         valid_loss, valid_accuracy = [], []
         bal_valid_accuracy = []
         test_loss, test_accuracy = [], []
@@ -831,15 +829,19 @@ with tf.Session() as sess:
         while (epoch < max_epochs):
             train_batch_data, train_batch_labels = train_loader.next_batch()
             feed_dict_train = {x_pl: train_batch_data, y_pl: train_batch_labels}
-            # deciding which parts to fetch, train_op makes the classifier "train"
-            fetches_train = [calculate_gradient_norms_l1, calculate_gradient_norms_l2, train_op, cross_entropy, accuracy]
             # running the train_op and computing the updated training loss and accuracy
-            res = sess.run(fetches=fetches_train, feed_dict=feed_dict_train)
-            # storing cross entropy (second fetch argument, so index=1)
-            _train_loss += [res[3]]
-            _train_accuracy += [res[4]]
-            _gradientnorms_l1 = np.vstack((_gradientnorms_l1, np.array(res[0])))
-            _gradientnorms_l2 = np.vstack((_gradientnorms_l2, np.array(res[1])))
+            if STORE_GRADIENT_NORMS and iteration_ctr % nskip_iter_GN == 0:
+                res = sess.run(fetches=[calculate_gradient_norms_l2, train_op, cross_entropy, accuracy], feed_dict=feed_dict_train)
+                # storing cross entropy (second fetch argument, so index=1)
+                _train_loss += [res[2]]
+                _train_accuracy += [res[3]]
+                _gradientnorms_l2 = np.vstack((_gradientnorms_l2, np.array(res[0])))
+            else:
+                res = sess.run(fetches=[train_op, cross_entropy, accuracy], feed_dict=feed_dict_train)
+                # storing cross entropy (second fetch argument, so index=1)
+                _train_loss += [res[1]]
+                _train_accuracy += [res[2]]
+            iteration_ctr+=1
             ### VALIDATING ###
             # When we reach the last mini-batch of the epoch
             if train_loader.is_epoch_done():
@@ -901,7 +903,7 @@ with tf.Session() as sess:
                  'best_bal_train_accuracy': best_bal_train_accuracy, 'best_bal_valid_loss': best_bal_valid_loss,
                  'best_bal_valid_accuracy': best_bal_valid_accuracy, 'best_bal_epoch': best_bal_epoch}
         scipy.io.savemat(save_path_perf + filename + "_ACCURACY", mdict)
-        scipy.io.savemat(save_path_perf + filename + "_GRADIENTNORMS", {'GN_L1': _gradientnorms_l1, 'GN_L2': _gradientnorms_l2})
+        if STORE_GRADIENT_NORMS: scipy.io.savemat(save_path_perf + filename + "_GRADIENTNORMS", {'GN_L2': _gradientnorms_l2})
 
         # Saving the weights
         TIME_saving_start = time.time()
