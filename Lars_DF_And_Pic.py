@@ -77,7 +77,8 @@ max_epochs_fast = 2
 max_epochs_regular = 300
 # Batch size
 batch_size = 1000
-STORE_GRADIENT_NORMS = False
+USE_GRADIENT_CLIPPING = True
+STORE_GRADIENT_NORMS = True
 USE_LR_DECAY = False #learning rate decay: exponentially decreasing the learning rate over the epochs, so that we do not overshoot the (local) optimum when we get close
 learning_rate_END = .0001 #if USE_LR_DECAY is set to True, then the learning rate will exponentially decay at every epoch and will reach learning_rate_END at the last epoch
 NAME_SAFETY_PREFIX = "" #set this to "" for normal behaviour. Set it to any other string if you are just testing things and want to avvoid overwriting important stuff
@@ -712,10 +713,18 @@ with tf.variable_scope('loss'):
     if STORE_GRADIENT_NORMS: calculate_gradient_norms_l2 = [ tf.norm(tf.gradients(cross_entropy, all_vars[j]), 2, name="gradnorm_l2_%d"%j) for j in range(len(all_vars)) ]
 
 with tf.variable_scope('training'):
-    LR = tf.placeholder(tf.float64, shape=[]) #that way we can change the learning rate on the fly
-    sgd = tf.train.MomentumOptimizer(learning_rate=LR, momentum=momentum, use_nesterov=True)
-    train_op = sgd.minimize(cross_entropy, var_list=to_train)
-        
+	LR = tf.placeholder(tf.float64, shape=[]) #that way we can change the learning rate on the fly
+	sgd = tf.train.MomentumOptimizer(learning_rate=LR, momentum=momentum, use_nesterov=True)
+	grads_and_vars = sgd.compute_gradients(cross_entropy, var_list=to_train)
+	if USE_GRADIENT_CLIPPING:	
+		print("grads_and_vars has length: ", len(grads_and_vars))
+		print("....this is grads_and_vars[0]", grads_and_vars[0])
+		print("....this is grads_and_vars[0][0]", grads_and_vars[0][0])
+		print("....this is grads_and_vars[0][1]", grads_and_vars[0][1])
+		clipped_gradients = [(tf.clip_by_norm(grad, 3), var) for grad, var in grads_and_vars]
+		train_op = sgd.apply_gradients(clipped_gradients)
+	else:
+		train_op = sgd.apply_gradients(grads_and_vars)
 
 with tf.variable_scope('performance'):
     # making a one-hot encoded vector of correct (1) and incorrect (0) predictions
