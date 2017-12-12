@@ -3,7 +3,7 @@
 %========================================
 folder = 'results_mat/performance/';
 plot_folder = 'accuracy_plots/';
-loadfile = 'LarsDeepFourier_dfT_dfcnn1X_dfcnn2X_dfcnn3X_pzcnn1TL_pzcnn2NL_pzfc1NL_pzfc2NL_pzoutL_A_unbal_LR0-005_ME300_LRD_ACCURACY'; 
+loadfile = 'piczak_A_unbal_LR0-01_ME300_ACCURACY.mat'; 
 %========================================
 
 load([folder loadfile]);

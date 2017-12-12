@@ -36,7 +36,7 @@ RUN_FAST = True
 # If we want oversampled (balanced) mini-batches or not
 BALANCED_BATCHES = False
 # Learning rate
-learning_rate = 0.005
+learning_rate = 0.002
 # Number of epochs (only one is relevant acc. to which RUN_FAST value has been given)
 max_epochs_fast = 2
 max_epochs_regular = 100
@@ -68,7 +68,7 @@ k_test = k_test - 1
 data_folder = "./data/"
 
 ib = icebreaker(phase=IB_PHASE, lr=learning_rate, max_epochs = max_epochs, TEST = False)
-DF_arch = "Heuri1" # the DF architecture that we will use!!
+DF_arch = "HeuriSmall" # the DF architecture that we will use!!
 if DF_arch == "Heuri1":
     DF_net_weight_names = ['DF_conv1d_1_kernel',
                                 'DF_conv1d_1_bias',
@@ -201,7 +201,50 @@ if DF_arch == "Heuri1":
         DF_OUTPUT = tf.expand_dims(a2, axis=3)
         # a2 = tf.reshape(a2, )
         print('DF_pool2 \t\t', DF_OUTPUT.get_shape())
-        #very imortant!
+
+elif DF_arch == "HeuriSmall":
+    ###DEEP_FOURIER LAYERS HYPERPARAMETERS
+    # Conv1, MaxPool1 parameters
+    DF_padding_conv1 = "valid" #doesn't matter 'cause it adds up
+    DF_filters_1 = 60  # phi1
+    DF_kernel_size_1 = 1024
+    DF_strides_conv1 = 512
+
+    ### DEEP FOURIER NETWORK
+    with tf.variable_scope('DF_convLayer1'):
+        ### INPUT DATA
+        print("--- Deep Fourier conv layer 1")
+        print('x_pl \t\t', x_pl.get_shape())
+        ### CONV1 LAYER
+        # Layer build
+        ### CHECK IF WEIGHT LOADING\INITIALIZE
+        if ib.shall_DF_be_loaded():
+            df1_ker_init = tf.constant_initializer(ib.pretrained_DF[0])
+            df1_bias_init = tf.constant_initializer(ib.pretrained_DF[1])
+            print('Pretrained DF_conv1d_1 loaded!')
+        else:
+            df1_ker_init = df1_bias_init = tf.contrib.layers.xavier_initializer(uniform=True, seed=None, dtype=tf.float32)
+            print('DF_conv1d_1 reinitialized with Xavier!')
+        z1 = tf.layers.conv1d(inputs=x_pl,
+                              filters=DF_filters_1,
+                              kernel_size=DF_kernel_size_1,
+                              strides=DF_strides_conv1,
+                              padding=DF_padding_conv1,
+                              activation=tf.nn.relu,
+                              use_bias=True,
+                              kernel_initializer=df1_ker_init,
+                              bias_initializer=df1_bias_init,
+                              trainable=True,
+                              name="DF_conv_1",
+                              )
+        # Input pass, activation
+        print('DF_conv1 \t\t', z1.get_shape())
+    
+        # Reshaping to swtich dimension and get them right (to 41x60 to 60x41x1)
+        a1 = tf.transpose(z1, perm=[0, 2, 1])
+        DF_OUTPUT = tf.expand_dims(a1, axis=3)
+        # a2 = tf.reshape(a2, )
+        print('DF_pool2 \t\t', DF_OUTPUT.get_shape())
 
 
 from dimensions_PZ import *

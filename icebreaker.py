@@ -33,7 +33,7 @@ class icebreaker:
             if not os.path.exists(directory):
                 os.makedirs(directory)
         if not (self.phase == PHASE3 and self.TEST == True): 
-            PZ_toload_weights = "results_mat/trainedweights/piczak_A_unbal_LR0-002_ME300_WEIGHTS" #the good old file
+            PZ_toload_weights = "results_mat/trainedweights/piczak_A_unbal_LR0-01_ME300_BAL_WEIGHTS" #the good old file
             print('loading Piczak part from the old days when we trained Piczak alone: ' + PZ_toload_weights)
             self.tw_good_old_PZ = loadmat(PZ_toload_weights)
             
