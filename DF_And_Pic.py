@@ -132,7 +132,8 @@ if DF_arch == "Heuri1":
             df1_bias_init = tf.constant_initializer(ib.pretrained_DF[1])
             print('Pretrained DF_conv1d_1 loaded!')
         else:
-            df1_ker_init = df1_bias_init = tf.contrib.layers.xavier_initializer(uniform=True, seed=None, dtype=tf.float32)
+            df1_ker_init = tf.contrib.layers.xavier_initializer(uniform=True, seed=None, dtype=tf.float32)
+            df1_bias_init = tf.zeros_initializer()
             print('DF_conv1d_1 reinitialized with Xavier!')
         z1 = tf.layers.conv1d(inputs=x_pl,
                               filters=DF_filters_1,
@@ -168,7 +169,8 @@ if DF_arch == "Heuri1":
             df2_ker_init = tf.constant_initializer(ib.pretrained_DF[2])
             df2_bias_init = tf.constant_initializer(ib.pretrained_DF[3])
         else:
-            df2_ker_init = df2_bias_init = tf.contrib.layers.xavier_initializer(uniform=True, seed=None, dtype=tf.float32)
+            df2_ker_init = tf.contrib.layers.xavier_initializer(uniform=True, seed=None, dtype=tf.float32)
+            df2_bias_init = tf.zeros_initializer()
         # Layer build
         z2 = tf.layers.conv1d(inputs=a1,
                               filters=DF_filters_2,
@@ -223,7 +225,8 @@ elif DF_arch == "HeuriSmall":
             df1_bias_init = tf.constant_initializer(ib.pretrained_DF[1])
             print('Pretrained DF_conv1d_1 loaded!')
         else:
-            df1_ker_init = df1_bias_init = tf.contrib.layers.xavier_initializer(uniform=True, seed=None, dtype=tf.float32)
+            df1_ker_init = tf.contrib.layers.xavier_initializer(uniform=True, seed=None, dtype=tf.float32)
+            df1_bias_init = tf.zeros_initializer()
             print('DF_conv1d_1 reinitialized with Xavier!')
         z1 = tf.layers.conv1d(inputs=x_pl,
                               filters=DF_filters_1,
