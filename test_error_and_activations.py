@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function 
 import matplotlib.pyplot as plt
 import numpy as np
+import librosa
 import os
 import sys
 sys.path.append(os.path.join('.', '..')) 
@@ -23,17 +24,24 @@ from sklearn.metrics import confusion_matrix
 tf.reset_default_graph()
 
 # =============================================================================
-our_good_filename = "LarsDeepFourier_dfT_dfcnn1X_dfcnn2X_dfcnn3X_pzcnn1TL_pzcnn2NL_pzfc1NL_pzfc2NL_pzoutL_A_unbal_LR0-005_ME300_LRD" #<-- the experiment name of interest
+learned_weights_file = "Heuri1_OLA_L_LR0-002_ME100" #<-- the experiment name of interest
+tw = scipy.io.loadmat("./results_mat/trainedweights/" + learned_weights_file + "_BAL_WEIGHTS.mat")
+
 #if one of them is True, we include the DF part as well, because we calculate the test error on the whole DF+PZ net
-include_DF_HeurNet = False
-include_DF_MST = True 
+include_DF_HeurNet = True
+include_DF_MST = False 
 # =============================================================================
+data_folder = "./data/"
+
+ONLY_EXAMPLE_OBSERVATIONS = True #if True, then it is way faster and of course the test error makes no sense
+STORE_ACTIVATIONS = True
+STORE_TEST_ERROR = False
+#provide a filename extension here!
+if ONLY_EXAMPLE_OBSERVATIONS: learned_weights_file += "_RANDOM_OBS"
+if STORE_TEST_ERROR: save_path_perf = "./results_mat/performance/" + learned_weights_file + "_TESTERROR.mat"
+if STORE_ACTIVATIONS: save_path_activ = "./results_mat/performance/" + learned_weights_file + "_ACTIVATIONS.mat"
 
 k_test = 10
-data_folder = "./data/"
-tw = scipy.io.loadmat("./results_mat/trainedweights/" + our_good_filename + "_WEIGHTS.mat")
-save_path_perf = "./results_mat/performance/" + our_good_filename + "_TESTERROR.mat"
-
 ################################
 ###   GET  TRAINED WEIGHTS   ###
 ################################
@@ -454,42 +462,68 @@ with tf.variable_scope('performance'):
 ###    TESTING on fold 10  ###
 ##############################
 
-if include_DF_HeurNet or include_DF_MST:
-    test_data=scipy.io.loadmat(data_folder + 'fold{}_wav.mat'.format(k_test))
-    test_data=np.expand_dims(test_data['ob_wav'],axis=-1)
-else:
-    test_data=scipy.io.loadmat(data_folder + 'fold{}_spcgm.mat'.format(k_test))
-    test_data=np.expand_dims(test_data['ob_spcgm'],axis=-1)
-y_test_true=scipy.io.loadmat(data_folder + 'fold{}_labels.mat'.format(k_test))
-y_test_true=utils.onehot(np.transpose(y_test_true['lb']), num_classes) #One-hot encoding labels
+if not ONLY_EXAMPLE_OBSERVATIONS:
+    gpu_opts = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
+    if include_DF_HeurNet or include_DF_MST:
+        test_data=scipy.io.loadmat(data_folder + 'fold{}_wav.mat'.format(k_test))
+        test_data=np.expand_dims(test_data['ob_wav'],axis=-1)
+    else:
+        test_data=scipy.io.loadmat(data_folder + 'fold{}_spcgm.mat'.format(k_test))
+        test_data=np.expand_dims(test_data['ob_spcgm'],axis=-1)
+    y_test_true=scipy.io.loadmat(data_folder + 'fold{}_labels.mat'.format(k_test))
+    y_test_true=utils.onehot(np.transpose(y_test_true['lb']), num_classes) #One-hot encoding labels
+else: #calculate only a dummy test error on random data
+    gpu_opts = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
+#    just for testing
+    small_data = 2
+    test_data = np.random.normal(0, 1, [small_data, 20992, 1]).astype('float32')
+    y_test_true = utils.onehot(np.random.randint(0, 10, small_data), 10)
 
-#just for testing
-#small_data = 27
-#test_data = np.random.normal(0, 1, [small_data, 20992, 1]).astype('float32')
-#y_test_true = utils.onehot(np.random.randint(0, 10, small_data), 10)
-
-# restricting memory usage, TensorFlow is greedy and will use all memory otherwise
-gpu_opts = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
 
 eat_this = {x_pl_1: test_data, y_pl: y_test_true}
 fetches_test = [y, cross_entropy, accuracy]
 
+A = np.sin(2*np.pi*np.arange(20992)*400/20000) #about 400 Hz
+B = np.sin(2*np.pi*np.arange(20992)*200/20000) #about 400 Hz
+C = A + B
+D = np.hstack((np.sin(2*np.pi*np.arange(10992)*200/20000), np.sin(2*np.pi*np.arange(10000)*400/20000)))
+D[:3500] = 0
+D[14500:18000] = 0
+E = np.sin(2*np.pi*np.arange(20992)*20/20000*150/20992*np.arange(1, 20993))
+
+#wav_signals = np.vstack((A, B, C, D, E))
+wav_signals = scipy.io.loadmat("data/fold10_RANDOM_OBS")['picked_obs']
+
+all_spcgm = np.zeros((0, 60, 41), np.float64)
+for j in range(wav_signals.shape[0]):
+    spcgm = librosa.feature.melspectrogram(wav_signals[j], hop_length=512, n_fft=1024, sr=22050, n_mels=60) #how Karol does it
+    spcgm = spcgm[:, :41] #for some reason the spcgm returned by spcgm has a width of 42 so we have to trim it to 41
+    spcgm = librosa.logamplitude(spcgm) #how Karol does it
+    all_spcgm = np.vstack((all_spcgm, [spcgm]))
+
+wav_signals = np.expand_dims(wav_signals, -1)
+synth = {x_pl_1: wav_signals}
+
 sess=tf.Session(config=tf.ConfigProto(gpu_options=gpu_opts))
 sess.run(tf.global_variables_initializer())
-res = sess.run(fetches=fetches_test, feed_dict=eat_this)
+if STORE_TEST_ERROR: res = sess.run(fetches=fetches_test, feed_dict=eat_this)
+activations_of_wav_signals = sess.run(a2, synth)
 sess.close()
 
-y_test_pred = res[0]
-test_loss = res[1]
-test_accuracy = res[2]
-#from softmax to class
-y_test_pred = np.argmax(y_test_pred, axis=1) 
-y_test_true = utils.onehot_inverse(y_test_true)
-conf_mat = confusion_matrix(y_test_true, y_test_pred, labels=range(10))
-cba = utils.classbal_acc(conf_mat)
+if STORE_TEST_ERROR:
+    y_test_pred = res[0]
+    test_loss = res[1]
+    test_accuracy = res[2]
+    #from softmax to class
+    y_test_pred = np.argmax(y_test_pred, axis=1) 
+    y_test_true = utils.onehot_inverse(y_test_true)
+    conf_mat = confusion_matrix(y_test_true, y_test_pred, labels=range(10))
+    cba = utils.classbal_acc(conf_mat)
+    
+    mdict = {'test_loss': test_loss, 'test_accuracy': test_accuracy, 'conf_mat': conf_mat, 'acc_classbal': cba}
+    scipy.io.savemat(save_path_perf, mdict)
+    print("performance saved under %s...." % save_path_perf)
 
-mdict = {'test_loss': test_loss, 'test_accuracy': test_accuracy, 'conf_mat': conf_mat, 'acc_classbal': cba}
-scipy.io.savemat(save_path_perf, mdict)
-print("performance saved under %s...." % save_path_perf)
+if STORE_ACTIVATIONS: scipy.io.savemat(save_path_activ, {'wavact' : activations_of_wav_signals, 'wav': wav_signals, 'mel': all_spcgm})
 
 print("<><><><><><><><> the entire program finished without errors!! <><><><><><><><>")

@@ -1,74 +1,93 @@
-% Load activations
-%load('./results_mat/performance/WITH_ACTIVATION_WITH_PURE_DF_PRETRAINING_deepFourier_dfN_dfcnn1L_dfcnn2L_pzcnn1TX_pzcnn2TX_pzfc1TX_pzfc2TX_pzoutX_A_unbal_LR0-002_ME300_BAL_TESTERROR.mat');
-Ole1_activations = activation_DF2;
+WAV = 0;
+SPC = 1;
+%============================================================
+path = 'results_mat/performance/';
+name1 = 'Heuri1_OLA_';
+name2 = '_LR0-002_ME100_RANDOM_OBS';
+name3 = '_ACTIVATIONS';
+what2plot = SPC;
+%============================================================
+close all
 
-% dove cazzo si trova quel file?
-%load('./results_mat/performance/WITH_ACTIVATION_deepFourier_dfT_dfcnn1X_dfcnn2X_pzcnn1TL_pzcnn2NL_pzfc1NL_pzfc2NL_pzoutL_A_unbal_LR0-002_ME300_BAL_TESTERROR');
-%%
-Lars1_activations = activation_DF2;
+load([path name1 'O' name2 name3]);
+wav_obs = wav;
+MEL_spc = mel;
+Ole1_act = wavact;
+load([path name1 'L' name2 name3]);
+Lars1_act = wavact;
+load([path name1 'A' name2 name3]);
+ALL_act = wavact;
 
-% Load spectrograms
-load('./data/fold10_spcgm')
-MEL_spectrograms = ob_spcgm;
+num_rows = 5;
+num_cols = 4;
 
-% Load data labels
-load('./data/fold10_labels')
-data_labels = lb;
-
-% Clear unused variables
-clear acc_classbal activation_DF2 conf_mat lb ob_spcgm test_accuracy test_loss
-%% Extract one example per class
-labels = unique(data_labels);
-
-%Create class masks
-masks = struct;
-for i = 1:length(labels)
-    key = "mask"+i;
-    masks.(key) = find(data_labels == labels(i));
-end
-
-%Consider one observation per class
-Lars1_obs = [];
-Ole1_obs = [];
-MEL_obs = [];
-for i = 1:length(labels)
-    key = "mask"+i;
-    mask = masks.(key);
-    pick_obs = randi(length(mask),1);
-    tmp = Lars1_activations(mask,:,:);
-    Lars1_obs(i,:,:) = tmp(pick_obs,:,:);
-    tmp = Ole1_activations(mask,:,:);
-    Ole1_obs(i,:,:) = tmp(pick_obs,:,:);
-    tmp = MEL_spectrograms(mask,:,:);
-    MEL_obs(i,:,:) =  tmp(pick_obs,:,:);
-    picked(i) = pick_obs;
-end
 
 %%
-for i = 1:length(labels)
-    figure
-    
-    %Plot a figure for each observation's activation for Ole1
-    subplot(1,3,1)
-    colormap('jet')
-    image_toplot = reshape(Lars1_obs(i,:,:), [60 41]);
-    image(image_toplot);
-    titlestr = "LARS1: Activation of obs " + picked(i) +". C" + i;
-    title(titlestr)
-    
-    %Plot a figure for each observation's activation for Ole1
-    subplot(1,3,2)
-    colormap('jet')
-    image_toplot = reshape(Ole1_obs(i,:,:), [60 41]);
-    image(image_toplot);
-    titlestr = "OLE1: Activation of obs " + picked(i) +". C" + i;
-    title(titlestr)
-    
-    %Plot the corresponding spectrogram
-    subplot(1,3,3)
-    colormap('jet')
-    image_toplot = reshape(MEL_obs(i,:,:), [60 41]);
-    image(image_toplot);
-    titlestr = "MEL of obs " + picked(i) +". C" + i;
-    title(titlestr)
+offset = 0;
+figure
+for i = 0:(num_rows-1)
+    if what2plot == WAV
+        %Plot the signl in time domain
+        subplot(num_rows,1,i+1)
+        plot(reshape(wav_obs(i+offset+1,:,:), [1 20992]));
+        axis off
+        grid
+        titlestr = 'wav';
+        ylabel("signal"+(i+1))
+        if i == 0
+            title(titlestr)
+        end
+    elseif what2plot == SPC
+        %Plot the corresponding mel spectrogram
+        subplot(num_rows,num_cols,i*num_cols+1)
+        colormap('jet')
+        image_toplot = reshape(MEL_spc(i+offset+1,:,:), [60 41]);
+        image(image_toplot);
+        axis off
+        titlestr = 'MEL';
+        if i == 0
+            title(titlestr)
+        end
+        
+        %Plot a figure for each observation's activation for Ole1
+        subplot(num_rows,num_cols,i*num_cols+2)
+        colormap('jet')
+        image_toplot = reshape(Ole1_act(i+offset+1,:,:), [60 41]);
+        image(image_toplot);
+        axis off
+        titlestr = 'Phase 1';
+        if i == 0
+            title(titlestr)
+        end
+        
+        %Plot a figure for each observation's activation for Ole1
+        subplot(num_rows,num_cols,i*num_cols+3)
+        colormap('jet')
+        image_toplot = reshape(Lars1_act(i+offset+1,:,:), [60 41]);
+        image(image_toplot);
+        axis off
+        titlestr = 'Phase 2';
+        if i == 0
+            title(titlestr)
+        end
+        
+        %Plot a figure for each observation's activation for Ole1
+        subplot(num_rows,num_cols,i*num_cols+4)
+        colormap('jet')
+        image_toplot = reshape(ALL_act(i+offset+1,:,:), [60 41]);
+        image(image_toplot);
+        axis off
+        titlestr = 'Phase 3';
+        if i == 0
+            title(titlestr)
+        end
+    end
 end
+if what2plot == WAV
+    name = [path name1 name2 '_WAV'];
+elseif what2plot == SPC
+    name = [path name1 name2 name3];
+end
+
+saveas(gcf, name, 'fig')
+saveas(gcf, name, 'png')
