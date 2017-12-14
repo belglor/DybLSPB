@@ -304,9 +304,9 @@ with tf.variable_scope('loss'):
 
 with tf.variable_scope('training'):
     # defining our optimizer
-    sgd = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=momentum, use_nesterov=True)
+    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
     # applying the gradients
-    train_op = sgd.minimize(mean_squared_error, var_list=to_train)
+    train_op = optimizer.minimize(mean_squared_error, var_list=to_train)
 
 # %%
 ##############################
@@ -343,13 +343,17 @@ for i in range(1, 11):
     data_mat = np.expand_dims(data_mat['ob_wav'], axis=-1)
     data_folds.append(data_mat)
     labels_mat = scipy.io.loadmat(data_folder + 'fold{}_spcgm.mat'.format(i))
-    fold_spcgm_max_vals[i-1] = np.max(labels_mat) #max over the entire fold, entire data (all 3 dimensions)
-    fold_spcgm_min_vals[i-1] = np.min(labels_mat)
+    fold_spcgm_max_vals[i-1] = np.max(labels_mat['ob_spcgm']) #max over the entire fold, entire data (all 3 dimensions)
+    fold_spcgm_min_vals[i-1] = np.min(labels_mat['ob_spcgm'])
     #labels_mat = np.expand_dims(labels_mat['ob_spcgm'], axis=-1)
     labels_folds.append(labels_mat['ob_spcgm'])
 
 max_over_all_folds = np.max(fold_spcgm_max_vals)
 min_over_all_folds = np.min(fold_spcgm_min_vals)
+
+#Centering around the min and division by the range
+for i in range(10):
+    labels_folds[i]=(labels_folds[i]-min_over_all_folds)/(max_over_all_folds-min_over_all_folds)
 
 # %%
 ##########################
