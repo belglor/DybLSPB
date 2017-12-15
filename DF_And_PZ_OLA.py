@@ -50,7 +50,10 @@ max_epochs_fast = 2
 max_epochs_regular = 7
 # Batch size
 batch_size = 1000
-
+USE_GRADIENT_CLIPPING = True
+STORE_GRADIENT_NORMS = True
+NAME_SAFETY_PREFIX = "" #set this to "" for normal behaviour. Set it to any other string if you are just testing things and want to avvoid overwriting important stuff
+nskip_iter_GN = 20 #every nskip_iter_GN'th iteration we will take one measurement of the gradient L2 norm (measuring it at every iteration takes too much comp. time)  
 #########################
 ###   PRE-WORK WORK!  ###
 #########################
@@ -565,12 +568,21 @@ with tf.variable_scope('loss'):
     cross_entropy = -tf.reduce_sum(y_pl * tf.log(y + 1e-8), reduction_indices=[1])
     # averaging over samples
     cross_entropy = tf.reduce_mean(cross_entropy)
+    if STORE_GRADIENT_NORMS: calculate_gradient_norms_l2 = [ tf.norm(tf.gradients(cross_entropy, all_vars[j]), 2, name="gradnorm_l2_%d"%j) for j in range(len(all_vars)) ]
 
 with tf.variable_scope('training'):
-    # defining our optimizer
-    sgd = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=momentum, use_nesterov=True)
-    # applying the gradients
-    train_op = sgd.minimize(cross_entropy, var_list=to_train)
+	LR = tf.placeholder(tf.float64, shape=[]) #that way we can change the learning rate on the fly
+	sgd = tf.train.MomentumOptimizer(learning_rate=LR, momentum=momentum, use_nesterov=True)
+	grads_and_vars = sgd.compute_gradients(cross_entropy, var_list=to_train)
+	if USE_GRADIENT_CLIPPING:	
+		print("grads_and_vars has length: ", len(grads_and_vars))
+		print("....this is grads_and_vars[0]", grads_and_vars[0])
+		print("....this is grads_and_vars[0][0]", grads_and_vars[0][0])
+		print("....this is grads_and_vars[0][1]", grads_and_vars[0][1])
+		clipped_gradients = [(tf.clip_by_norm(grad, 3), var) for grad, var in grads_and_vars]
+		train_op = sgd.apply_gradients(clipped_gradients)
+	else:
+		train_op = sgd.apply_gradients(grads_and_vars)
 
 with tf.variable_scope('performance'):
     # making a one-hot encoded vector of correct (1) and incorrect (0) predictions
@@ -639,7 +651,7 @@ with tf.Session() as sess:
 
         # We reinitialize the weights
         sess.run(tf.global_variables_initializer())
-        epoch = 0
+        epoch = iteration_ctr = 0
 
         mask = [True] * n_fold
         for k in [k_valid, k_test]:
@@ -672,6 +684,7 @@ with tf.Session() as sess:
         train_loss, train_accuracy = [], []
         # Training loss and accuracy within an epoch (is erased at every new epoch)
         _train_loss, _train_accuracy = [], []
+        if STORE_GRADIENT_NORMS: _gradientnorms_l2 = np.empty((0, len(all_vars)), float)
         valid_loss, valid_accuracy = [], []
         bal_valid_accuracy = []
         test_loss, test_accuracy = [], []
@@ -684,11 +697,18 @@ with tf.Session() as sess:
             # deciding which parts to fetch, train_op makes the classifier "train"
             fetches_train = [train_op, cross_entropy, accuracy]
             # running the train_op and computing the updated training loss and accuracy
-            res = sess.run(fetches=fetches_train, feed_dict=feed_dict_train)
-            # storing cross entropy (second fetch argument, so index=1)
-            _train_loss += [res[1]]
-            _train_accuracy += [res[2]]
-
+            if STORE_GRADIENT_NORMS and iteration_ctr % nskip_iter_GN == 0:
+                res = sess.run(fetches=[calculate_gradient_norms_l2, train_op, cross_entropy, accuracy], feed_dict=feed_dict_train)
+                # storing cross entropy (second fetch argument, so index=1)
+                _train_loss += [res[2]]
+                _train_accuracy += [res[3]]
+                _gradientnorms_l2 = np.vstack((_gradientnorms_l2, np.array(res[0])))
+            else:
+                res = sess.run(fetches=[train_op, cross_entropy, accuracy], feed_dict=feed_dict_train)
+                # storing cross entropy (second fetch argument, so index=1)
+                _train_loss += [res[1]]
+                _train_accuracy += [res[2]]
+            iteration_ctr+=1
             ### VALIDATING ###
             # When we reach the last mini-batch of the epoch
             if train_loader.is_epoch_done():
@@ -750,9 +770,55 @@ with tf.Session() as sess:
                  'bal_valid_accuracy': bal_valid_accuracy, 'best_bal_train_loss': best_bal_train_loss,
                  'best_bal_train_accuracy': best_bal_train_accuracy, 'best_bal_valid_loss': best_bal_valid_loss,
                  'best_bal_valid_accuracy': best_bal_valid_accuracy, 'best_bal_epoch': best_bal_epoch}
-        scipy.io.savemat(ib.good_place_to_store_perf() + "_ACCURACY", mdict)
-        print("'balanced' weights (numpy arrays) saved under %s....: " % (ib.good_place_to_store_perf() + "_ACCURACY") )
-        ib.save_weights(best_bal_weights)
+        scipy.io.savemat(save_path_perf + filename + "_ACCURACY", mdict)
+        if STORE_GRADIENT_NORMS: scipy.io.savemat(save_path_perf + filename + "_GRADIENTNORMS", {'GN_L2': _gradientnorms_l2})
+
+        # Saving the weights
+        TIME_saving_start = time.time()
+        print("performance saved under %s...." % save_path_perf)
+        scipy.io.savemat(save_path_numpy_weights + filename + "_WEIGHTS", dict(
+            DF_conv1d_1_kernel=best_weights[0],
+            DF_conv1d_1_bias=best_weights[1],
+            DF_conv1d_2_kernel=best_weights[2],
+            DF_conv1d_2_bias=best_weights[3],
+            DF_conv1d_3_kernel=best_weights[4],
+            DF_conv1d_3_bias=best_weights[5],
+            PZ_conv2d_1_kernel=best_weights[6],
+            PZ_conv2d_1_bias=best_weights[7],
+            PZ_conv2d_2_kernel=best_weights[8],
+            PZ_conv2d_2_bias=best_weights[9],
+            dense_1_kernel=best_weights[10],
+            dense_1_bias=best_weights[11],
+            dense_2_kernel=best_weights[12],
+            dense_2_bias=best_weights[13],
+            output_kernel=best_weights[14],
+            output_bias=best_weights[15]
+        ))
+        print("weights (numpy arrays) saved under %s....: " % save_path_numpy_weights)
+        print("... saving took {:10.2f} sec".format(time.time() - TIME_saving_start))
+
+        # Saving the weights
+        # TIME_saving_start = time.time()
+        scipy.io.savemat(save_path_numpy_weights + filename + "_BAL_WEIGHTS", dict(
+            DF_conv1d_1_kernel=best_bal_weights[0],
+            DF_conv1d_1_bias=best_bal_weights[1],
+            DF_conv1d_2_kernel=best_bal_weights[2],
+            DF_conv1d_2_bias=best_bal_weights[3],
+            DF_conv1d_3_kernel=best_bal_weights[4],
+            DF_conv1d_3_bias=best_bal_weights[5],
+            PZ_conv2d_1_kernel=best_bal_weights[6],
+            PZ_conv2d_1_bias=best_bal_weights[7],
+            PZ_conv2d_2_kernel=best_bal_weights[8],
+            PZ_conv2d_2_bias=best_bal_weights[9],
+            dense_1_kernel=best_bal_weights[10],
+            dense_1_bias=best_bal_weights[11],
+            dense_2_kernel=best_bal_weights[12],
+            dense_2_bias=best_bal_weights[13],
+            output_kernel=best_bal_weights[14],
+            output_bias=best_bal_weights[15]
+        ))
+        print("'balanced' weights (numpy arrays) saved under %s....: " % save_path_numpy_weights)
+        print("... saving took {:10.2f} sec".format(time.time() - TIME_saving_start))
 
     except KeyboardInterrupt:
         pass
