@@ -16,7 +16,12 @@ num_PZ_trainables = 10
 
 net_weight_names_DF_Heuri1 = ['DF_conv1d_1_kernel'] + ['DF_conv1d_1_bias'] + ['DF_conv1d_2_kernel'] + ['DF_conv1d_2_bias']
 
-net_weight_names_DF_MST = net_weight_names_DF_Heuri1 + ['DF_conv1d_3_kernel'] + ['DF_conv1d_3_bias']
+net_weight_names_DF_MST = ['DF_conv1d_1_kernel',
+'DF_conv1d_1_bias',
+'DF_conv1d_2_kernel',
+'DF_conv1d_2_bias',    
+'DF_conv1d_3_kernel',
+'DF_conv1d_3_bias']
 
 PHASE1, PHASE2, PHASE3 = 1, 2, 3 
 word_phase = [None, "O", "L", "A"]
@@ -46,7 +51,9 @@ class icebreaker:
             print('loading Piczak part from the good old days when we trained Piczak alone: ' + good_old_PZ_W_file)
             self.tw_good_old_PZ = loadmat(good_old_PZ_W_file)
         if archname == "MST" and self.phase == PHASE1:
-            self.pretrained_DF = loadmat(SF)
+            SF_mat = loadmat(SF)
+            self.pretrained_DF = [SF_mat[name] for name in self.net_weight_names_DF]
+            print('loaded MST weights from Spectrogram forcing')
         if self.phase > PHASE1 or self.TEST:
             if self.TEST == False:
                 load_phase = self.save_path_numpy_weights + self.name%word_phase[(self.phase-1)]

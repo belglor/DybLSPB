@@ -383,34 +383,34 @@ elif DF_arch == "MST":
         # Input pass, activation
         print('DF_conv2 \t\t', z2.get_shape())
         
-        with tf.variable_scope('DF_convLayer3'):
-            if ib.shall_DF_be_loaded():
-                z3 = tf.layers.conv1d(inputs=z2,
-                                  filters=DF_filters_3,
-                                  kernel_size=DF_kernel_size_3,
-                                  strides=DF_strides_conv3,
-                                  padding=DF_padding_conv3,
-                                  activation=tf.nn.tanh,
-                                  use_bias=True,
-                                  kernel_initializer=tf.constant_initializer(np.copy(ib.pretrained_DF[4])),
-                                  bias_initializer=tf.constant_initializer(np.copy(ib.pretrained_DF[5])),
-                                  trainable=True,
-                                  name="DF_conv_3",
-                                  )
-            else:
-                z3 = tf.layers.conv1d(inputs=z2,
-                                  filters=DF_filters_3,
-                                  kernel_size=DF_kernel_size_3,
-                                  strides=DF_strides_conv3,
-                                  padding=DF_padding_conv3,
-                                  activation=tf.nn.tanh,
-                                  use_bias=True,
-                                  kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None,
-                                                                                          dtype=tf.float32),
-                                  bias_initializer=tf.zeros_initializer(),
-                                  trainable=True,
-                                  name="DF_conv_3",
-                                  )
+    with tf.variable_scope('DF_convLayer3'):
+        if ib.shall_DF_be_loaded():
+            z3 = tf.layers.conv1d(inputs=z2,
+                              filters=DF_filters_3,
+                              kernel_size=DF_kernel_size_3,
+                              strides=DF_strides_conv3,
+                              padding=DF_padding_conv3,
+                              activation=tf.nn.tanh,
+                              use_bias=True,
+                              kernel_initializer=tf.constant_initializer(np.copy(ib.pretrained_DF[4])),
+                              bias_initializer=tf.constant_initializer(np.copy(ib.pretrained_DF[5])),
+                              trainable=True,
+                              name="DF_conv_3",
+                              )
+        else:
+            z3 = tf.layers.conv1d(inputs=z2,
+                              filters=DF_filters_3,
+                              kernel_size=DF_kernel_size_3,
+                              strides=DF_strides_conv3,
+                              padding=DF_padding_conv3,
+                              activation=tf.nn.tanh,
+                              use_bias=True,
+                              kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None,
+                                                                                      dtype=tf.float32),
+                              bias_initializer=tf.zeros_initializer(),
+                              trainable=True,
+                              name="DF_conv_3",
+                              )
         # Input pass, activation
         # Reshaping to swtich dimension and get them right (to 41x60 to 60x41x1)
     a2 = tf.expand_dims(tf.transpose(z3, perm=[0, 2, 1]), axis=-1)
