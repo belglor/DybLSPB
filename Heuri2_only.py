@@ -35,12 +35,12 @@ RUN_FAST = True
 # If we want oversampled (balanced) mini-batches or not
 BALANCED_BATCHES = False
 # Learning rate
-learning_rate = 0.01
+learning_rate = 0.0003
 # Number of epochs (only one is relevant acc. to which RUN_FAST value has been given)
 max_epochs_fast = 2
-max_epochs_regular = 300
+max_epochs_regular = 200
 # Batch size
-batch_size = 1000
+batch_size = 100
 
 #########################
 ###   PRE-WORK WORK!  ###
@@ -163,7 +163,7 @@ with tf.variable_scope('DF_convLayer1'):
                           padding=DF_padding_conv1,
                           # data_format='channels_last',
                           # dilation_rate=1,
-                          activation=tf.nn.abs,
+                          activation=tf.abs,
                           use_bias=True,
                           kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None,
                                                                                   dtype=tf.float32),
@@ -308,6 +308,7 @@ data_folds = []
 labels_folds = []
 fold_spcgm_max_vals = np.zeros(10, np.float64)
 fold_spcgm_min_vals = np.zeros(10, np.float64)
+fold_spcgm_mean_vals = np.zeros(10, np.float64)
 for i in range(1, 11):
     data_mat = scipy.io.loadmat(data_folder + 'fold{}_wav.mat'.format(i))
     # Add one dimension for being eligible for the network
@@ -316,15 +317,17 @@ for i in range(1, 11):
     labels_mat = scipy.io.loadmat(data_folder + 'fold{}_spcgm.mat'.format(i))
     fold_spcgm_max_vals[i-1] = np.max(labels_mat['ob_spcgm']) #max over the entire fold, entire data (all 3 dimensions)
     fold_spcgm_min_vals[i-1] = np.min(labels_mat['ob_spcgm'])
+    fold_spcgm_mean_vals[i - 1] = np.mean(labels_mat['ob_spcgm'])
     #labels_mat = np.expand_dims(labels_mat['ob_spcgm'], axis=-1)
     labels_folds.append(labels_mat['ob_spcgm'])
 
+mean_over_all_folds = np.mean(fold_spcgm_mean_vals)
 max_over_all_folds = np.max(fold_spcgm_max_vals)
 min_over_all_folds = np.min(fold_spcgm_min_vals)
 
 #Centering around the min and division by the range
 for i in range(10):
-    labels_folds[i]=(labels_folds[i]-min_over_all_folds)/(max_over_all_folds-min_over_all_folds)
+    labels_folds[i]=(labels_folds[i]-mean_over_all_folds)/(max_over_all_folds-min_over_all_folds)
 # %%
 ##########################
 ###   TRAINING LOOP    ###
