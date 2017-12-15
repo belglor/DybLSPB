@@ -163,7 +163,7 @@ with tf.variable_scope('DF_convLayer1'):
                           padding=DF_padding_conv1,
                           # data_format='channels_last',
                           # dilation_rate=1,
-                          activation=tf.nn.relu,
+                          activation=tf.nn.abs,
                           use_bias=True,
                           kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None,
                                                                                   dtype=tf.float32),
@@ -275,9 +275,9 @@ with tf.variable_scope('loss'):
 
 with tf.variable_scope('training'):
     # defining our optimizer
-    sgd = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=momentum, use_nesterov=True)
+    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
     # applying the gradients
-    train_op = sgd.minimize(mean_squared_error, var_list=to_train)
+    train_op = optimizer.minimize(mean_squared_error, var_list=to_train)
 
 # %%
 ##############################
@@ -306,15 +306,25 @@ print('Forward pass successful!')
 # Folds creation : lists with all the np.array's inside
 data_folds = []
 labels_folds = []
+fold_spcgm_max_vals = np.zeros(10, np.float64)
+fold_spcgm_min_vals = np.zeros(10, np.float64)
 for i in range(1, 11):
     data_mat = scipy.io.loadmat(data_folder + 'fold{}_wav.mat'.format(i))
     # Add one dimension for being eligible for the network
     data_mat = np.expand_dims(data_mat['ob_wav'], axis=-1)
     data_folds.append(data_mat)
     labels_mat = scipy.io.loadmat(data_folder + 'fold{}_spcgm.mat'.format(i))
+    fold_spcgm_max_vals[i-1] = np.max(labels_mat['ob_spcgm']) #max over the entire fold, entire data (all 3 dimensions)
+    fold_spcgm_min_vals[i-1] = np.min(labels_mat['ob_spcgm'])
     #labels_mat = np.expand_dims(labels_mat['ob_spcgm'], axis=-1)
     labels_folds.append(labels_mat['ob_spcgm'])
 
+max_over_all_folds = np.max(fold_spcgm_max_vals)
+min_over_all_folds = np.min(fold_spcgm_min_vals)
+
+#Centering around the min and division by the range
+for i in range(10):
+    labels_folds[i]=(labels_folds[i]-min_over_all_folds)/(max_over_all_folds-min_over_all_folds)
 # %%
 ##########################
 ###   TRAINING LOOP    ###
