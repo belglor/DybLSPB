@@ -29,8 +29,8 @@ STEP_L = 2 #Train DF and first PZ layer
 STEP_A = 3 #Train everything
 #word_phase = ["O", "L", "A"]
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-DF_arch = "MST" # "Heuri1"  "MelNet"
-STEP = STEP_A
+DF_arch = "Heuri2"  # "MST" # "Heuri1"  "MelNet"
+STEP = STEP_O
 good_old_PZ_W_file = "results_mat/trainedweights/piczak_A_unbal_LR0-01_ME300_BAL_WEIGHTS"
 Spcgm_forcing_trained_W_file = "results_mat/trainedweights/the file with the weights where Sebastien forced the DF to learn a spectrogram"
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -47,11 +47,11 @@ BALANCED_BATCHES = False
 learning_rate = 0.002
 # Number of epochs (only one is relevant acc. to which RUN_FAST value has been given)
 max_epochs_fast = 2
-max_epochs_regular = 7
+max_epochs_regular = 100
 # Batch size
 batch_size = 1000
-USE_GRADIENT_CLIPPING = True
-STORE_GRADIENT_NORMS = True
+USE_GRADIENT_CLIPPING = False
+STORE_GRADIENT_NORMS = False
 NAME_SAFETY_PREFIX = "" #set this to "" for normal behaviour. Set it to any other string if you are just testing things and want to avvoid overwriting important stuff
 nskip_iter_GN = 20 #every nskip_iter_GN'th iteration we will take one measurement of the gradient L2 norm (measuring it at every iteration takes too much comp. time)  
 #########################
@@ -419,6 +419,78 @@ elif DF_arch == "MST":
     a2 = tf.expand_dims(tf.transpose(z3, perm=[0, 2, 1]), axis=-1)
     print('Output \t\t',a2.get_shape())
 
+elif DF_arch == "Heuri2":
+    DF_padding_conv1 = "same"
+    DF_filters_1 = 80  # phi1
+    DF_kernel_size_1 = 1024
+    DF_strides_conv1 = 512
+
+    DF_padding_conv2 = 'same'
+    DF_filters_2 = 60  # phi2
+    DF_kernel_size_2 = 15
+    DF_strides_conv2 = 1
+    
+    x_pl = tf.placeholder(tf.float32, [None, length, nchannels], name='xPlaceholder_1')
+    y_pl = tf.placeholder(tf.float64, [None, bands, frames], name='yPlaceholder')
+    y_pl = tf.cast(y_pl, tf.float32)
+    with tf.variable_scope('DF_convLayer1'):
+        if ib.shall_DF_be_loaded():
+            z1 = tf.layers.conv1d(inputs=x_pl,
+                              filters=DF_filters_1,
+                              kernel_size=DF_kernel_size_1,
+                              strides=DF_strides_conv1,
+                              padding=DF_padding_conv1,
+                              activation=tf.abs,
+                              use_bias=True,
+                              kernel_initializer=tf.constant_initializer(np.copy(ib.pretrained_DF[0])),
+                              bias_initializer=tf.constant_initializer(np.copy(ib.pretrained_DF[1])),
+                              trainable=True,
+                              name="DF_conv_1",
+                              )
+        else:
+            z1 = tf.layers.conv1d(inputs=x_pl,
+                              filters=DF_filters_1,
+                              kernel_size=DF_kernel_size_1,
+                              strides=DF_strides_conv1,
+                              padding=DF_padding_conv1,
+                              activation=tf.abs,
+                              use_bias=True,
+                              kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None,
+                                                                                      dtype=tf.float32),
+                              bias_initializer=tf.zeros_initializer(),
+                              trainable=True,
+                              name="DF_conv_1",
+                              )
+    
+    with tf.variable_scope('DF_convLayer2'):
+        if ib.shall_DF_be_loaded():
+            a2 = tf.layers.conv1d(inputs=z1,
+                              filters=DF_filters_2,
+                              kernel_size=DF_kernel_size_2,
+                              strides=DF_strides_conv2,
+                              padding=DF_padding_conv2,
+                              activation=tf.nn.tanh,
+                              use_bias=True,
+                              kernel_initializer=tf.constant_initializer(np.copy(ib.pretrained_DF[2])),
+                              bias_initializer=tf.constant_initializer(np.copy(ib.pretrained_DF[3])),
+                              trainable=True,
+                              name="DF_conv_2",
+                              )
+        else:
+            a2 = tf.layers.conv1d(inputs=z1,
+                              filters=DF_filters_2,
+                              kernel_size=DF_kernel_size_2,
+                              strides=DF_strides_conv2,
+                              padding=DF_padding_conv2,
+                              activation=tf.nn.tanh,
+                              use_bias=True,
+                              kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=True, seed=None,
+                                                                                      dtype=tf.float32),
+                              bias_initializer=tf.zeros_initializer(),
+                              trainable=True,
+                              name="DF_conv_2",
+                              )
+
 elif DF_arch == "MelNet": 
     raise Exception("MelNet not yet implemented!")
     x_pl = tf.placeholder(tf.float32, [None, length, nchannels], name='xPlaceholder_1')
@@ -575,10 +647,6 @@ with tf.variable_scope('training'):
 	sgd = tf.train.MomentumOptimizer(learning_rate=LR, momentum=momentum, use_nesterov=True)
 	grads_and_vars = sgd.compute_gradients(cross_entropy, var_list=to_train)
 	if USE_GRADIENT_CLIPPING:	
-		print("grads_and_vars has length: ", len(grads_and_vars))
-		print("....this is grads_and_vars[0]", grads_and_vars[0])
-		print("....this is grads_and_vars[0][0]", grads_and_vars[0][0])
-		print("....this is grads_and_vars[0][1]", grads_and_vars[0][1])
 		clipped_gradients = [(tf.clip_by_norm(grad, 3), var) for grad, var in grads_and_vars]
 		train_op = sgd.apply_gradients(clipped_gradients)
 	else:
@@ -770,56 +838,9 @@ with tf.Session() as sess:
                  'bal_valid_accuracy': bal_valid_accuracy, 'best_bal_train_loss': best_bal_train_loss,
                  'best_bal_train_accuracy': best_bal_train_accuracy, 'best_bal_valid_loss': best_bal_valid_loss,
                  'best_bal_valid_accuracy': best_bal_valid_accuracy, 'best_bal_epoch': best_bal_epoch}
-        scipy.io.savemat(save_path_perf + filename + "_ACCURACY", mdict)
+        scipy.io.savemat(ib.good_place_to_store_perf(), mdict)
         if STORE_GRADIENT_NORMS: scipy.io.savemat(save_path_perf + filename + "_GRADIENTNORMS", {'GN_L2': _gradientnorms_l2})
-
-        # Saving the weights
-        TIME_saving_start = time.time()
-        print("performance saved under %s...." % save_path_perf)
-        scipy.io.savemat(save_path_numpy_weights + filename + "_WEIGHTS", dict(
-            DF_conv1d_1_kernel=best_weights[0],
-            DF_conv1d_1_bias=best_weights[1],
-            DF_conv1d_2_kernel=best_weights[2],
-            DF_conv1d_2_bias=best_weights[3],
-            DF_conv1d_3_kernel=best_weights[4],
-            DF_conv1d_3_bias=best_weights[5],
-            PZ_conv2d_1_kernel=best_weights[6],
-            PZ_conv2d_1_bias=best_weights[7],
-            PZ_conv2d_2_kernel=best_weights[8],
-            PZ_conv2d_2_bias=best_weights[9],
-            dense_1_kernel=best_weights[10],
-            dense_1_bias=best_weights[11],
-            dense_2_kernel=best_weights[12],
-            dense_2_bias=best_weights[13],
-            output_kernel=best_weights[14],
-            output_bias=best_weights[15]
-        ))
-        print("weights (numpy arrays) saved under %s....: " % save_path_numpy_weights)
-        print("... saving took {:10.2f} sec".format(time.time() - TIME_saving_start))
-
-        # Saving the weights
-        # TIME_saving_start = time.time()
-        scipy.io.savemat(save_path_numpy_weights + filename + "_BAL_WEIGHTS", dict(
-            DF_conv1d_1_kernel=best_bal_weights[0],
-            DF_conv1d_1_bias=best_bal_weights[1],
-            DF_conv1d_2_kernel=best_bal_weights[2],
-            DF_conv1d_2_bias=best_bal_weights[3],
-            DF_conv1d_3_kernel=best_bal_weights[4],
-            DF_conv1d_3_bias=best_bal_weights[5],
-            PZ_conv2d_1_kernel=best_bal_weights[6],
-            PZ_conv2d_1_bias=best_bal_weights[7],
-            PZ_conv2d_2_kernel=best_bal_weights[8],
-            PZ_conv2d_2_bias=best_bal_weights[9],
-            dense_1_kernel=best_bal_weights[10],
-            dense_1_bias=best_bal_weights[11],
-            dense_2_kernel=best_bal_weights[12],
-            dense_2_bias=best_bal_weights[13],
-            output_kernel=best_bal_weights[14],
-            output_bias=best_bal_weights[15]
-        ))
-        print("'balanced' weights (numpy arrays) saved under %s....: " % save_path_numpy_weights)
-        print("... saving took {:10.2f} sec".format(time.time() - TIME_saving_start))
-
+        ib.save_weights(best_bal_weights)
     except KeyboardInterrupt:
         pass
 

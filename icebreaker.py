@@ -14,7 +14,7 @@ net_weight_names_PZ = ['conv2d_1_kernel',
 'output_bias' ]
 num_PZ_trainables = 10
 
-net_weight_names_DF_Heuri1 = ['DF_conv1d_1_kernel'] + ['DF_conv1d_1_bias'] + ['DF_conv1d_2_kernel'] + ['DF_conv1d_2_bias']
+net_weight_names_DF_Heuri1 = net_weight_names_DF_Heuri2 = ['DF_conv1d_1_kernel'] + ['DF_conv1d_1_bias'] + ['DF_conv1d_2_kernel'] + ['DF_conv1d_2_bias']
 
 net_weight_names_DF_MST = ['DF_conv1d_1_kernel',
 'DF_conv1d_1_bias',
@@ -34,6 +34,7 @@ class icebreaker:
         self.TEST = TEST
         if archname == "MST": self.net_weight_names_DF = net_weight_names_DF_MST
         elif archname == "Heuri1": self.net_weight_names_DF = net_weight_names_DF_Heuri1
+        elif archname == "Heuri2": self.net_weight_names_DF = net_weight_names_DF_Heuri2
         elif archname == "MelNet": self.net_weight_names_DF = net_weight_names_DF_MelNet
         else: raise Exception("unknown DF architecture")
         self.archname = archname
@@ -50,10 +51,10 @@ class icebreaker:
         if not (self.phase == PHASE3 and self.TEST): 
             print('loading Piczak part from the good old days when we trained Piczak alone: ' + good_old_PZ_W_file)
             self.tw_good_old_PZ = loadmat(good_old_PZ_W_file)
-        if archname == "MST" and self.phase == PHASE1:
+        if (archname == "MST" or archname == "Heuri2") and self.phase == PHASE1:
             SF_mat = loadmat(SF)
             self.pretrained_DF = [SF_mat[name] for name in self.net_weight_names_DF]
-            print('loaded MST weights from Spectrogram forcing')
+            print('loaded %d weights from Spectrogram forcing'%archname)
         if self.phase > PHASE1 or self.TEST:
             if self.TEST == False:
                 load_phase = self.save_path_numpy_weights + self.name%word_phase[(self.phase-1)]
@@ -75,10 +76,10 @@ class icebreaker:
             self.pretrained_PZ += [tw_from_phase   [net_weight_names_PZ[j]] for j in range(2, num_PZ_trainables)]
             
     def shall_DF_be_loaded(self):
-        return self.phase > PHASE1 or self.TEST or self.archname == "MST"
+        return self.phase > PHASE1 or self.TEST or self.archname == "MST" or archname == "Heuri2"
     
     def good_place_to_store_perf(self):
-        return self.save_path_perf + self.name%word_phase[self.phase]
+        return self.save_path_perf + self.name%word_phase[self.phase] + "_ACCURACY"
     
     def what_is_trainable(self, AV):
         if self.phase == PHASE1: return 0, len(self.net_weight_names_DF)
