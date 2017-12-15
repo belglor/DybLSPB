@@ -54,7 +54,7 @@ class icebreaker:
         if (archname == "MST" or archname == "Heuri2") and self.phase == PHASE1:
             SF_mat = loadmat(SF)
             self.pretrained_DF = [SF_mat[name] for name in self.net_weight_names_DF]
-            print('loaded %d weights from Spectrogram forcing'%archname)
+            print('loaded %s weights from Spectrogram forcing'%archname)
         if self.phase > PHASE1 or self.TEST:
             if self.TEST == False:
                 load_phase = self.save_path_numpy_weights + self.name%word_phase[(self.phase-1)]
@@ -76,7 +76,7 @@ class icebreaker:
             self.pretrained_PZ += [tw_from_phase   [net_weight_names_PZ[j]] for j in range(2, num_PZ_trainables)]
             
     def shall_DF_be_loaded(self):
-        return self.phase > PHASE1 or self.TEST or self.archname == "MST" or archname == "Heuri2"
+        return self.phase > PHASE1 or self.TEST or self.archname == "MST" or self.archname == "Heuri2"
     
     def good_place_to_store_perf(self):
         return self.save_path_perf + self.name%word_phase[self.phase] + "_ACCURACY"

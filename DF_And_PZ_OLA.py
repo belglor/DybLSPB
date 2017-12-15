@@ -31,8 +31,8 @@ STEP_A = 3 #Train everything
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 DF_arch = "Heuri2"  # "MST" # "Heuri1"  "MelNet"
 STEP = STEP_O
-good_old_PZ_W_file = "results_mat/trainedweights/piczak_A_unbal_LR0-01_ME300_BAL_WEIGHTS"
-Spcgm_forcing_trained_W_file = "results_mat/trainedweights/the file with the weights where Sebastien forced the DF to learn a spectrogram"
+good_old_PZ_W_file = "results_mat/trainedweights/piczakNorm_A_unbal_LR0-002_ME300_BAL_WEIGHTS.mat"
+Spcgm_forcing_trained_W_file = "results_mat/trainedweights/Heuri2_only_A_unbal_LR0-0003_ME200_WEIGHTS.mat"
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 n_fold = 10
@@ -52,6 +52,8 @@ max_epochs_regular = 100
 batch_size = 1000
 USE_GRADIENT_CLIPPING = False
 STORE_GRADIENT_NORMS = False
+USE_LR_DECAY = False #learning rate decay: exponentially decreasing the learning rate over the epochs, so that we do not overshoot the (local) optimum when we get close
+learning_rate_END = .0001 #if USE_LR_DECAY is set to True, then the learning rate will exponentially decay at every epoch and will reach learning_rate_END at the last epoch
 NAME_SAFETY_PREFIX = "" #set this to "" for normal behaviour. Set it to any other string if you are just testing things and want to avvoid overwriting important stuff
 nskip_iter_GN = 20 #every nskip_iter_GN'th iteration we will take one measurement of the gradient L2 norm (measuring it at every iteration takes too much comp. time)  
 #########################
@@ -76,7 +78,12 @@ else:
 ib = icebreaker(STEP, learning_rate, max_epochs, DF_arch, good_old_PZ_W_file, Spcgm_forcing_trained_W_file)
 
 print('"A" method with validation on fold' + str(k_valid) + 'and test on fold' + str(k_test))
-print('Learning rate : {0}'.format(learning_rate))
+if USE_LR_DECAY:
+    LRD_FACTOR = (learning_rate_END/learning_rate)**(1./(max_epochs-1))
+    lr_array = learning_rate*(LRD_FACTOR**np.arange(max_epochs))
+else:
+    lr_array = learning_rate*np.ones(max_epochs, float) # learning rate stays constant
+print("the learning rate will start at {0} and end at {1}".format(lr_array[0], lr_array[-1]) )
 
 # Naming of output files
 # We just shift -1 the folds indices to match with Python way to think
@@ -429,9 +436,8 @@ elif DF_arch == "Heuri2":
     DF_filters_2 = 60  # phi2
     DF_kernel_size_2 = 15
     DF_strides_conv2 = 1
-    
     x_pl = tf.placeholder(tf.float32, [None, length, nchannels], name='xPlaceholder_1')
-    y_pl = tf.placeholder(tf.float64, [None, bands, frames], name='yPlaceholder')
+    y_pl = tf.placeholder(tf.float64, [None, num_classes], name='yPlaceholder')
     y_pl = tf.cast(y_pl, tf.float32)
     with tf.variable_scope('DF_convLayer1'):
         if ib.shall_DF_be_loaded():
@@ -490,7 +496,10 @@ elif DF_arch == "Heuri2":
                               trainable=True,
                               name="DF_conv_2",
                               )
-
+        a2 = tf.expand_dims(tf.transpose(a2,perm=[0,2,1]), axis=3)
+                              
+                              
+                              
 elif DF_arch == "MelNet": 
     raise Exception("MelNet not yet implemented!")
     x_pl = tf.placeholder(tf.float32, [None, length, nchannels], name='xPlaceholder_1')
@@ -761,7 +770,7 @@ with tf.Session() as sess:
         TIME_epoch_start = time.time()
         while (epoch < max_epochs):
             train_batch_data, train_batch_labels = train_loader.next_batch()
-            feed_dict_train = {x_pl: train_batch_data, y_pl: train_batch_labels}
+            feed_dict_train = {x_pl: train_batch_data, y_pl: train_batch_labels, LR: lr_array[epoch]}
             # deciding which parts to fetch, train_op makes the classifier "train"
             fetches_train = [train_op, cross_entropy, accuracy]
             # running the train_op and computing the updated training loss and accuracy
