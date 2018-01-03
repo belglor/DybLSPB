@@ -24,15 +24,14 @@ from icebreaker import *
 ###RESET GRAPH
 tf.reset_default_graph()
 
-STEP_O = 1 #Train only DF 
-STEP_L = 2 #Train DF and first PZ layer
-STEP_A = 3 #Train everything
-#word_phase = ["O", "L", "A"]
+PHASE1 = 1 #Train only DF 
+PHASE2 = 2 #Train DF and first PZ layer
+PHASE3 = 3 #Train everything
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-DF_arch = "Heuri2"  # "MST" # "Heuri1"  "MelNet"
-STEP = STEP_O
-good_old_PZ_W_file = "results_mat/trainedweights/piczakNorm_A_unbal_LR0-002_ME300_BAL_WEIGHTS.mat"
-Spcgm_forcing_trained_W_file = "results_mat/trainedweights/Heuri2_only_A_unbal_LR0-0003_ME200_WEIGHTS.mat"
+DF_arch =   "MST" #"Heuri1"
+STEP = PHASE1
+good_old_PZ_W_file = "results_mat/trainedweights/Piczak.mat"
+Spcgm_forcing_trained_W_file = "results_mat/trainedweights/MST_sf.mat"
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 n_fold = 10
@@ -103,8 +102,6 @@ save_path_numpy_weights = result_mat_folder + "trainedweights/"
 for directory in [save_path_perf, save_path_numpy_weights]:
     if not os.path.exists(directory):
         os.makedirs(directory)
-
-#filename = "Heuri1_OLA_{0}_LR{1}_ME{2}".format(word_phase[STEP], word_lr, max_epochs) # I had to change our long filenames, because the 'X' was not die Wahrheit anymore
 
 # %%
 ################################
@@ -291,7 +288,7 @@ if DF_arch == "Heuri1":
 
 		# Activation pass, pooling
 		a2 = (pool2(z2))
-		# Reshaping to swtich dimension and get them right (to 41x60 to 60x41x1)
+		# Reshaping to swtich dimension and get them right (41x60 to 60x41x1)
 		a2 = tf.transpose(a2, perm=[0, 2, 1])
 		a2 = tf.expand_dims(a2, axis=3)
 		# a2 = tf.reshape(a2, )
@@ -422,7 +419,7 @@ elif DF_arch == "MST":
                               name="DF_conv_3",
                               )
         # Input pass, activation
-        # Reshaping to swtich dimension and get them right (to 41x60 to 60x41x1)
+        # Reshaping to swtich dimension and get them right (41x60 to 60x41x1)
     a2 = tf.expand_dims(tf.transpose(z3, perm=[0, 2, 1]), axis=-1)
     print('Output \t\t',a2.get_shape())
 
@@ -676,7 +673,6 @@ with tf.variable_scope('performance'):
 x_test_forward = np.random.normal(0, 1, [50, 20992, 1]).astype('float32')  # dummy data
 y_dummy_train = utils.onehot(np.random.randint(0, 10, 50), 10)
 
-# This hell line
 if RUN_FAST: gpu_opts = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)# don't kill the laptop
 else: gpu_opts = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
 
@@ -741,11 +737,6 @@ with tf.Session() as sess:
         for i_merge in range(n_fold - 2):
             merged_train_data = np.vstack((merged_train_data, train_data[i_merge]))
             merged_train_labels = np.vstack((merged_train_labels, train_labels[i_merge]))
-
-        # ### COMMENT THIS OUT AND UNCOMMENT ABOVE FOR FULL TRAINING DATA
-        #        i_merge = 1;
-        #        merged_train_data = np.vstack((merged_train_data, train_data[i_merge]))
-        #        merged_train_labels = np.vstack((merged_train_labels, train_labels[i_merge]))
 
         train_data = merged_train_data
         train_labels = merged_train_labels

@@ -24,7 +24,7 @@ net_weight_names_DF_MST = ['DF_conv1d_1_kernel',
 'DF_conv1d_3_bias']
 
 PHASE1, PHASE2, PHASE3 = 1, 2, 3 
-word_phase = [None, "O", "L", "A"]
+word_phase = [None, "Phase1", "Phase2", "Phase3"]
 
 class icebreaker:
     #Phase 0: Ole1
@@ -41,7 +41,7 @@ class icebreaker:
         word_lr = str(lr)
         word_lr = word_lr[:1] + '-' + word_lr[2:]
         self.phase = phase
-        self.name = archname + "_OLA_%s_LR{0}_ME{1}".format(word_lr, max_epochs)  
+        self.name = archname + "_%s_LR{0}_ME{1}".format(word_lr, max_epochs)  
         result_mat_folder = "./results_mat/"
         self.save_path_perf = result_mat_folder + "performance/"
         self.save_path_numpy_weights = result_mat_folder + "trainedweights/"

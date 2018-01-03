@@ -1,0 +1,3 @@
+please copy the following 2 files from the DEMO on DTUInside into this folder:
+weights/Piczak.mat
+weights/MST_sf.mat
