@@ -11,9 +11,10 @@ Link to the final article: https://github.com/belglor/DybLSPB/blob/master/DeepFo
 
 
 ## Demo code, trainable model and examples
-Welcome to the DeepFourier project. You can run, for example, the file DF_And_PZ_IceBreaker.py.
 
-To do this, please check results_mat/trainedweights/missing.txt for a list of 2 weight files you need to download.
+A fully runnable example can be found in the DEMO folder. The file is a jupyter notebook called DEMO.ipynb.
+
+One can find other runnable examples in the main folder, i.e. DF_And_PZ_IceBreaker.py. In order to run them, please check results_mat/trainedweights/missing.txt for a list of 2 weight files you need to download.
 
 Then you can specify in the file DF_And_PZ_IceBreaker.py:
 * The network architecture in line 31
