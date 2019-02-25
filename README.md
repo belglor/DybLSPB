@@ -1,5 +1,7 @@
 # DybLSPB
 
+Link to the final article: https://github.com/belglor/DybLSPB/blob/master/DeepFourier.pdf
+
 Welcome to the DeepFourier project. You can run, for example, the file DF_And_PZ_IceBreaker.py.
 
 To do this, please check results_mat/trainedweights/missing.txt for a list of 2 weight files you need to download.
